@@ -34,7 +34,7 @@ INTERFACES
 
 To run the script, on any Internet connected Juniper Device...
 Execute the following command on the Operational mode prompt (>)
-op url https://files.charter.ca/index.php/s/CesF4jFmznnxzRk
+op url https://github.com/thewhitehouse007/junos-sys-check/blob/main/sys-checks.slax
 
 If you find any bugs or have suggestions for improvements/additional checks please forward them to <hidden>
 
