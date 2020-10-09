@@ -158,6 +158,44 @@ template system-template() {
         }
     }
 
+    /* SYSTEM STORAGE CHECK */
+
+    var $query35 = { <command> "show system storage"; }
+    var $result35 = jcs:invoke($query35);
+    var $filter35 = "\/dev\/(gpt\/junos|(da|bo)0s([12]a|3[ef]))";
+    mvar $test35 = "PASS";
+    if ($result35/multi-routing-engine-item) {
+        for-each ($result35/multi-routing-engine-item) {
+            for-each (./system-storage-information/filesystem[filesystem-name=='/dev/gpt/junos']) {
+                if (./used-percent >= 90) {
+                    <output> "SYSTEM:    *** FAIL *** : Disk Partition " _ mounted-on _ " on " _ ../../re-name _" is currently at " _ used-percent _ "% used space.";
+                    set $test35 = "FAIL";
+                }
+                else if (./used-percent >= 60) {
+                    <output> "SYSTEM:    **  WARN  ** : Disk Partition " _ mounted-on _ " on " _ ../../re-name _" is currently at " _ used-percent _ "% used space.";
+                    set $test35 = "FAIL";
+                }
+            }
+        }
+    }
+    else {
+        <system-storage-information> {
+            for-each ($result35/filesystem[filesystem-name==jcs:regex($filter35,filesystem-name)]) {
+                if (./used-percent >= 90) {
+                    <output> "SYSTEM:    *** FAIL *** : Disk Partition " _ mounted-on _ " is currently at " _ used-percent _ "% used space.";
+                    set $test35 = "FAIL";
+                }
+                else if (./used-percent >= 60) {
+                    <output> "SYSTEM:    **  WARN  ** : Disk Partition " _ mounted-on _ " is currently at " _ used-percent _ "% used space.";
+                    set $test35 = "FAIL";
+                }
+            }
+        }
+    }
+    if ($test35=="PASS") {
+        <output> "SYSTEM:    *   PASS   * : All tested disk partitions are below 60% Used.";
+    }
+
     /* LICENSE CHECK */
 
     var $query46 = {
