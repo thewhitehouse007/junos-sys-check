@@ -367,6 +367,33 @@ template system-template($SYSLOG_TAG) {
     }
 }
 
+template ospf-template($SYSLOG_TAG) {
+    mvar $message = "";
+
+    /* OSPF-NEIGHBORS-UP-COUNT */
+
+    var $query70 = {
+        <get-ospf-neighbor-information>;
+    }
+    var $result70 = jcs:invoke($query70);
+    var $count70 = count($result70/ospf-neighbor[ospf-neighbor-state=="Full"]);
+    set $message = "OSPF:      *   INFO   * : There are "_$count70 _ " OSPF neighbor sessions UP";
+    call send-message($SYSLOG_TAG, $message);
+
+    /* OSPF-NEIGHBOR-DOWN-IDENTIFICATION */
+
+    var $query80 = { <command> "show ospf interface"; }
+    var $result80 = jcs:invoke($query80);
+    <ospf-interface-information> {
+        for-each($result80/ospf-interface) {
+            if ((neighbor-count=="0") && (interface-name!="lo0.0")) {
+                set $message = "OSPF:      *** FAIL *** : Neighbor session configured on " _ interface-name _" is DOWN";
+                call send-message($SYSLOG_TAG, $message);
+            }
+        }
+    }
+}
+
 template ldp-template($SYSLOG_TAG) {
     mvar $message = "";
 
@@ -376,7 +403,7 @@ template ldp-template($SYSLOG_TAG) {
         <get-ldp-interface-information>;
     }
     var $ldp-int-information = jcs:invoke($query_ldp-int-information);
-    if ($ldp-int-information/output == "LDP instance is not running") {
+    if ($ldp-int-information[output=="LDP instance is not running"]) {
         set $message = "LDP:       *   INFO   * : LDP instance is not running";
         call send-message($SYSLOG_TAG, $message);
     }
@@ -400,33 +427,6 @@ template ldp-template($SYSLOG_TAG) {
         for-each($ldp-int-information/ldp-interface) {
             if (ldp-neighbor-count=="0") {
                 set $message = "LDP:       *** FAIL *** : Interface " _ interface-name _" has zero neighbors";
-                call send-message($SYSLOG_TAG, $message);
-            }
-        }
-    }
-}
-
-template ospf-template($SYSLOG_TAG) {
-    mvar $message = "";
-
-    /* OSPF-NEIGHBORS-UP-COUNT */
-
-    var $query70 = {
-        <get-ospf-neighbor-information>;
-    }
-    var $result70 = jcs:invoke($query70);
-    var $count70 = count($result70/ospf-neighbor[ospf-neighbor-state=="Full"]);
-    set $message = "OSPF:      *   INFO   * : There are "_$count70 _ " OSPF neighbor sessions UP";
-    call send-message($SYSLOG_TAG, $message);
-
-    /* OSPF-NEIGHBOR-DOWN-IDENTIFICATION */
-
-    var $query80 = { <command> "show ospf interface"; }
-    var $result80 = jcs:invoke($query80);
-    <ospf-interface-information> {
-        for-each($result80/ospf-interface) {
-            if ((neighbor-count=="0") && (interface-name!="lo0.0")) {
-                set $message = "OSPF:      *** FAIL *** : Neighbor session configured on " _ interface-name _" is DOWN";
                 call send-message($SYSLOG_TAG, $message);
             }
         }
