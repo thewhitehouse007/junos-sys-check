@@ -68,9 +68,7 @@ match /
         <output> "-------------------------------------------------------------------------------------------------------";
         call ospf-template($SYSLOG_TAG);
         <output> "-------------------------------------------------------------------------------------------------------";
-        call ldp-template($SYSLOG_TAG);
-        <output> "-------------------------------------------------------------------------------------------------------";
-        call rsvp-template($SYSLOG_TAG);
+        call mpls_template($SYSLOG_TAG);
         <output> "-------------------------------------------------------------------------------------------------------";
         call bgp-template($SYSLOG_TAG);
         <output> "-------------------------------------------------------------------------------------------------------";
@@ -394,37 +392,56 @@ template ospf-template($SYSLOG_TAG) {
     }
 }
 
-template ldp-template($SYSLOG_TAG) {
+template mpls_template($SYSLOG_TAG) {
+    mvar $message = "";
+
+    /* MPLS-CHECK */
+
+    var $query_mpls_int_information = {
+        <get-mpls-interface-information>
+    }
+    var $mpls_int_information = jcs:invoke($query_mpls_int_information);
+    if (!$mpls_int_information) {
+        set $message = "MPLS:       *   INFO   * : MPLS is not configured";
+        call send-message($SYSLOG_TAG, $message);
+    }
+    else {
+        call ldp_template($SYSLOG_TAG);
+        call rsvp_template($SYSLOG_TAG);
+    }
+}
+
+template ldp_template($SYSLOG_TAG) {
     mvar $message = "";
 
     /* LDP-NEIGHBORS-UP-COUNT */
 
-    var $query_ldp-int-information = {
+    var $query_ldp_int_information = {
         <get-ldp-interface-information>;
     }
-    var $ldp-int-information = jcs:invoke($query_ldp-int-information);
-    if ($ldp-int-information[output=="LDP instance is not running"]) {
+    var $ldp_int_information = jcs:invoke($query_ldp_int_information);
+    if (!$ldp_int_information/ldp-interface) {
         set $message = "LDP:       *   INFO   * : LDP instance is not running";
         call send-message($SYSLOG_TAG, $message);
     }
     else {
-        var $ldp-int-count = count($ldp-int-information/ldp-interface[ldp-neighbor-count=="1"]);
-        set $message = "LDP:       *   INFO   * : There are " _$ldp-int-count _ " LDP neighbor interfaces UP (inc lo0.0)";
+        var $ldp_int_count = count($ldp_int_information/ldp-interface[ldp-neighbor-count=="1"]);
+        set $message = "LDP:       *   INFO   * : There are " _$ldp_int_count _ " LDP neighbor interfaces UP (inc lo0.0)";
         call send-message($SYSLOG_TAG, $message);
 
         /* LDP-SESSION-UP-COUNT */
 
-        var $query_ldp-sessions = {
+        var $query_ldp_sessions = {
             <get-ldp-session-information>;
         }
-        var $ldp-sessions = jcs:invoke($query_ldp-sessions);
-        var $ldp-session-count = count($ldp-sessions/ldp-session[ldp-session-state=="Operational"]);
-        set $message = "LDP:       *   INFO   * : There are "_$ldp-session-count _ " neighbor sessions UP";
+        var $ldp_sessions = jcs:invoke($query_ldp_sessions);
+        var $ldp_session_count = count($ldp_sessions/ldp-session[ldp-session-state=="Operational"]);
+        set $message = "LDP:       *   INFO   * : There are "_$ldp_session_count _ " neighbor sessions UP";
         call send-message($SYSLOG_TAG, $message);
 
         /* LDP-NEIGHBOR-DOWN-IDENTIFICATION */
 
-        for-each($ldp-int-information/ldp-interface) {
+        for-each($ldp_int_information/ldp-interface) {
             if (ldp-neighbor-count=="0") {
                 set $message = "LDP:       *** FAIL *** : Interface " _ interface-name _" has zero neighbors";
                 call send-message($SYSLOG_TAG, $message);
@@ -433,7 +450,7 @@ template ldp-template($SYSLOG_TAG) {
     }
 }
 
-template rsvp-template($SYSLOG_TAG) {
+template rsvp_template($SYSLOG_TAG) {
     mvar $message = "";
 
     /* RSVP-NEIGHBORS-UP-COUNT */
