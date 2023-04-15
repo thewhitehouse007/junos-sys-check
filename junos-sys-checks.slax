@@ -68,11 +68,11 @@ match /
         <output> "-------------------------------------------------------------------------------------------------------";
         call system_template($SYSLOG_TAG);
         <output> "-------------------------------------------------------------------------------------------------------";
-        call ospf_template($SYSLOG_TAG);
+        call ospf_template($SYSLOG_TAG, $configuration);
         <output> "-------------------------------------------------------------------------------------------------------";
-        call mpls_template($SYSLOG_TAG);
+        call mpls_template($SYSLOG_TAG, $configuration);
         <output> "-------------------------------------------------------------------------------------------------------";
-        call bgp_template($SYSLOG_TAG);
+        call bgp_template($SYSLOG_TAG, $configuration);
         <output> "-------------------------------------------------------------------------------------------------------";
         call vpn_template($SYSLOG_TAG);
         <output> "-------------------------------------------------------------------------------------------------------";
@@ -368,58 +368,65 @@ template system_template($SYSLOG_TAG) {
     }
 }
 
-template ospf_template($SYSLOG_TAG) {
+template ospf_template($SYSLOG_TAG, $configuration) {
     mvar $message = "";
 
-    /* OSPF-NEIGHBORS-UP-COUNT */
+    /* OSPF-CONFIG-CHECK */
 
-    var $query_ospf_neighbours = {
-        <get-ospf-neighbor-information>;
+    if (!$configuration/protocols/ospf) {
+        set $message = "OSPF:      *   INFO   * : OSPF is not configured";
+        call send_message($SYSLOG_TAG, $message);
     }
-    var $ospf_neighbours = jcs:invoke($query_ospf_neighbours);
-    var $ospf_neighbour_count = count($ospf_neighbours/ospf-neighbor[ospf-neighbor-state=="Full"] || $ospf_neighbours/ospf-neighbor[ospf-neighbor-state=="2Way"]);
-    set $message = "OSPF:      *   INFO   * : There are "_$ospf_neighbour_count _ " OSPF neighbor sessions UP";
-    call send_message($SYSLOG_TAG, $message);
+    else {
+        /* OSPF-NEIGHBORS-UP-COUNT */
 
-    /* OSPF-NEIGHBOR-DOWN-IDENTIFICATION */
-
-    for-each($ospf_neighbours/ospf-neighbor) {
-        if (ospf-neighbor-state=="Exchange" || ospf-neighbor-state=="ExStart") {
-            set $message = "OSPF:      **  WARN  ** : Neighbour, "_ neighbor-address _" on "_ interface-name _ " has stalled, may be MTU issue";
-            call send_message($SYSLOG_TAG, $message);
+        var $query_ospf_neighbours = {
+            <get-ospf-neighbor-information>;
         }
-    }
+        var $ospf_neighbours = jcs:invoke($query_ospf_neighbours);
+        var $ospf_neighbour_count = count($ospf_neighbours/ospf-neighbor[ospf-neighbor-state=="Full"]) + count($ospf_neighbours/ospf-neighbor[ospf-neighbor-state=="2Way"]);
+        set $message = "OSPF:      *   INFO   * : There are "_$ospf_neighbour_count _ " OSPF neighbor sessions UP";
+        call send_message($SYSLOG_TAG, $message);
 
-    var $query_ospf_interfaces = { <command> "show ospf interface detail"; }
-    var $ospf_interfaces = jcs:invoke($query_ospf_interfaces);
-    <ospf-interface-information> {
-        for-each($ospf_interfaces/ospf-interface) {
-            if (ospf-interface-state=="Down") {
-                set $message = "OSPF:      *** FAIL *** : OSPF member interface, " _ interface-name _" is DOWN";
+        /* OSPF-NEIGHBOR-DOWN-IDENTIFICATION */
+
+        for-each($ospf_neighbours/ospf-neighbor) {
+            if ((ospf-neighbor-state=="Exchange") || (ospf-neighbor-state=="ExStart")) {
+                set $message = "OSPF:      **  WARN  ** : Neighbour, "_ neighbor-address _" on "_ interface-name _ " has stalled, may be MTU issue";
                 call send_message($SYSLOG_TAG, $message);
             }
-            if ((neighbor-count=="0") && (interface-name!="lo0.0") && (!ospf-interface-topology/ospf-topology-passive)) {
-                set $message = "OSPF:      **  WARN  ** : Interface " _ interface-name _" has no OSPF sessions";
-                call send_message($SYSLOG_TAG, $message);
+        }
+
+        var $query_ospf_interfaces = { <command> "show ospf interface detail"; }
+        var $ospf_interfaces = jcs:invoke($query_ospf_interfaces);
+        <ospf-interface-information> {
+            for-each($ospf_interfaces/ospf-interface) {
+                if (ospf-interface-state=="Down") {
+                    set $message = "OSPF:      *** FAIL *** : OSPF member interface, " _ interface-name _" is DOWN";
+                    call send_message($SYSLOG_TAG, $message);
+                }
+                if ((neighbor-count=="0") && (interface-name!="lo0.0") && (!ospf-interface-topology/ospf-topology-passive)) {
+                    set $message = "OSPF:      **  WARN  ** : Interface " _ interface-name _" has no OSPF sessions";
+                    call send_message($SYSLOG_TAG, $message);
+                }
             }
         }
     }
 }
 
-template mpls_template($SYSLOG_TAG) {
+template mpls_template($SYSLOG_TAG, $configuration) {
     mvar $message = "";
 
     /* MPLS-CHECK */
-
-    var $query_mpls_int_information = {
-        <get-mpls-interface-information>;
-    }
-    var $mpls_int_information = jcs:invoke($query_mpls_int_information);
-    if (!$mpls_int_information/mpls-interface) {
+    if (!$configuration/protocols/mpls) {
         set $message = "MPLS:      *   INFO   * : MPLS is not configured";
         call send_message($SYSLOG_TAG, $message);
     }
-    else {
+    else {        
+        var $query_mpls_int_information = {
+            <get-mpls-interface-information>;
+        }
+        var $mpls_int_information = jcs:invoke($query_mpls_int_information);
         
         /* MPLS-INTERFACE-UP-COUNT */
 
@@ -434,27 +441,27 @@ template mpls_template($SYSLOG_TAG) {
             call send_message($SYSLOG_TAG, $message);
         }
 
-        call ldp_template($SYSLOG_TAG);
+        call ldp_template($SYSLOG_TAG, $configuration);
         
-        call rsvp_template($SYSLOG_TAG);
+        call rsvp_template($SYSLOG_TAG, $configuration);
     }
 }
 
-template ldp_template($SYSLOG_TAG) {
+template ldp_template($SYSLOG_TAG, $configuration) {
     mvar $message = "";
 
-    var $query_ldp_int_information = {
-        <get-ldp-interface-information>;
-    }
-    var $ldp_int_information = jcs:invoke($query_ldp_int_information);
-    
     /* LDP-CHECK */
 
-    if (!$ldp_int_information/ldp-interface) { 
+    if (!$configuration/protocols/ldp) {
         set $message = "LDP:       *   INFO   * : LDP is not configured";
         call send_message($SYSLOG_TAG, $message);
     }
     else { 
+        var $query_ldp_int_information = {
+            <get-ldp-interface-information>;
+        }
+        var $ldp_int_information = jcs:invoke($query_ldp_int_information);
+
         /* LDP-NEIGHBORS-UP-COUNT */
     
         var $ldp_int_count = count($ldp_int_information/ldp-interface[ldp-neighbor-count=="1"]);
@@ -482,21 +489,20 @@ template ldp_template($SYSLOG_TAG) {
     }
 }
 
-template rsvp_template($SYSLOG_TAG) {
+template rsvp_template($SYSLOG_TAG, $configuration) {
     mvar $message = "";
 
-    var $query_rsvp_int_information = {
-        <get-rsvp-interface-information>;
-    }
-    var $rsvp_int_information = jcs:invoke($query_rsvp_int_information);
-    
     /* RSVP-CHECK- */
 
-    if (!$rsvp_int_information/rsvp-interface) {
+    if (!$configuration/protocols/rsvp) {
         set $message = "RSVP:      *   INFO   * : RSVP is not configured";
         call send_message($SYSLOG_TAG, $message);
     }
     else{
+        var $query_rsvp_int_information = {
+            <get-rsvp-interface-information>;
+        }
+        var $rsvp_int_information = jcs:invoke($query_rsvp_int_information);
     
         /* RSVP-NEIGHBORS-UP-COUNT */
 
@@ -530,21 +536,21 @@ template rsvp_template($SYSLOG_TAG) {
     }
 }
 
-template bgp_template($SYSLOG_TAG) {
+template bgp_template($SYSLOG_TAG, $configuration) {
     mvar $message = "";
 
     /* BGP-CHECK */
 
-    var $query_bgp_summary = {
-        <get-bgp-summary-information>;
-    }
-    var $bgp_summary = jcs:invoke($query_bgp_summary);
-    
-    if (!$bgp_summary/bgp-peer) {
+    if (!$configuration/protocols/bgp) {
         set $message = "BGP:       *   INFO   * : BGP is not configured";
         call send_message($SYSLOG_TAG, $message);
     }
     else {
+        var $query_bgp_summary = {
+            <get-bgp-summary-information>;
+        }
+        var $bgp_summary = jcs:invoke($query_bgp_summary);
+        
         /* BGP-NEIGHBORS-UP-COUNT */
 
         var $bgp_peer_count = count($bgp_summary/bgp-peer[peer-state=="Established"]);
