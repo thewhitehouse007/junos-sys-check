@@ -420,7 +420,7 @@ template ldp_template($SYSLOG_TAG) {
         <get-ldp-interface-information>;
     }
     var $ldp_int_information = jcs:invoke($query_ldp_int_information);
-    if (!$ldp_int_information/ldp-interface) {
+    if (!$ldp_int_information) {
         set $message = "LDP:       *   INFO   * : LDP instance is not running";
         call send-message($SYSLOG_TAG, $message);
     }
