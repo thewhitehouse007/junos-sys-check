@@ -14,34 +14,37 @@ The scripts basic functions are:
 
 #### CHASSIS
 * Checks for Chassis Alarms
-* Checks for failed hardware such as fans/mpcs/psu.
+* Checks for failed hardware such as fans/mpcs/psu
+* Checks that all attached PICs are online
 #### SYSTEM
 * Checks for any system alarms
 * Reports on system Uptime
 * Reports on connected users
-* Reports on the last configuration change and by which users
+* Reports on the last configuration change and by which user
 * Reports on the JunOS Version running and the device type etc
-* Checks in the Routing Engines are healthy or under load & cpu tempurature.
+* Compares the running version against the configured list of target versions
+* Checks in the Routing Engines are healthy or under load & cpu tempurature
 * Checks on Disk usage for important Partitions
 * Checks if any software licenses have expired or are oversubscribed.
 #### PROTOCOLS
 * Checks the following Protocols for status and neigbourship failures, etc
   * LDP
   * OSPF
-  * BGP
   * RSVP
+  * BGP
+#### VPN
+* Checks for VPN tunnel failures. (For SRX Only)
 #### INTERFACES
-* Checks for VPN tunnel failures.
 * Checks if any configured interfaces are operationally down. (may not be so useful on a switch)
 
 
 To run the script, on any Internet connected Juniper Device...
 Execute the following command on the Operational mode prompt (>)
-op url https://raw.githubusercontent.com/thewhitehouse007/junos-sys-check/main/sys-checks.slax
+op url https://raw.githubusercontent.com/thewhitehouse007/junos-sys-check/main/junos-sys-checks.slax
 
 If you find any bugs or have suggestions for improvements/additional checks please forward them to <hidden>
 
-### Example Output:
+### Example Console and SYSLOG Output:
 ```
 -------------------------------------------------------------------------------------------------------
                                        Welcome admin

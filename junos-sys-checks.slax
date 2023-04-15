@@ -1,0 +1,610 @@
+#!/usr/libexec/ui/cscript
+version 1.1;
+/*
+********************************************************
+This script is an op script that displays a snapshot of the most relevant information about the router,
+it's operational status and the status of major protocols and interfaces.
+It's set up in modular way so that you can add/remove a template and call function in the match /
+Feel free to email me at gwhite@charter.ca with questions or comments.
+********************************************************
+* To run this script it must be installed in           *
+* /var/db/scripts/op/ and called junos-sys-checks.slax *
+* The following configured must be present:            *
+* `set system scripts op file junos-sys-checks.slax`   *
+* Type: `op junos-sys-checks` to run it                *
+********************************************************
+*/
+
+ns junos = "http://xml.juniper.net/junos/*/junos";
+ns xnm = "http://xml.juniper.net/xnm/1.1/xnm";
+ns jcs = "http://xml.juniper.net/junos/commit-scripts/1.0";
+
+ns func extension = "http://exslt.org/functions";
+ns ztp = "http://xml.juniper.net/junos/ztp";
+ns exsl extension = "http://exslt.org/common";
+
+import "../import/junos.xsl";
+
+var $SYSLOG = "external.warning";
+var $TARGET-VERSIONS := {
+    <device> {
+        <model-name> "ex2200";
+        <target-version> "12.3R12.4";
+    }
+    <device> {
+        <model-name> "ex2300";
+        <target-version> "21.4R3-S3.4";
+    }
+    <device> {
+        <model-name> "srx220";
+        <target-version> "12.3X48-D105.4";
+    }
+    <device> {
+        <model-name> "srx320";
+        <target-version> "21.4R3-S3";
+    }
+}
+
+match /
+{
+    var $jnx = jcs:open();
+    mvar $message = "";
+
+    /*Get serial number on current device */
+    var $serial = ztp:serial-number( $jnx );
+    var $SYSLOG_TAG = " " _ $serial _ " - ";
+
+    <op-script-results>  {
+        <output> "-------------------------------------------------------------------------------------------------------";
+        set $message = "                                       Welcome "_ $user ;
+        call send-message($SYSLOG_TAG, $message);
+        <output> "-------------------------------------------------------------------------------------------------------";
+        set $message = "         ** This is the output of the sys_check script for "_ $serial _" on " _ $product _ " ** ";
+        call send-message($SYSLOG_TAG, $message);
+        <output> "-------------------------------------------------------------------------------------------------------";
+        call chassis-template($SYSLOG_TAG);
+        <output> "-------------------------------------------------------------------------------------------------------";
+        call system-template($SYSLOG_TAG);
+        <output> "-------------------------------------------------------------------------------------------------------";
+        call ospf-template();
+        <output> "-------------------------------------------------------------------------------------------------------";
+        call ldp-template();
+        <output> "-------------------------------------------------------------------------------------------------------";
+        call rsvp-template();
+        <output> "-------------------------------------------------------------------------------------------------------";
+        call bgp-template();
+        <output> "-------------------------------------------------------------------------------------------------------";
+        call vpn-template();
+        <output> "-------------------------------------------------------------------------------------------------------";
+        call interface-template();
+        <output> "-------------------------------------------------------------------------------------------------------";
+    }
+}
+
+template chassis-template($SYSLOG_TAG) {
+    mvar $message = "";
+
+    /* CHASSIS ALARMS */
+
+    var $query_chassis-alarms = { <command> "show chassis alarms"; }
+    var $result_chassis-alarms = jcs:invoke($query_chassis-alarms);
+    <alarm-information> {
+        for-each($result_chassis-alarms/alarm-detail) {
+            if (alarm-class == "Minor") {
+                set $message = "CHASSIS:   **  WARN  ** : " _ alarm-class _" ALARM - " _ alarm-description;
+                call send-message($SYSLOG_TAG, $message);
+            }
+            else if (alarm-class == "Major") {
+                set $message = "CHASSIS:   *** FAIL *** : " _ alarm-class _" ALARM - " _ alarm-description;
+                call send-message($SYSLOG_TAG, $message);
+            }
+            else {
+                set $message = "CHASSIS:   !!! ERROR !! : Active alarm was not captured by script";
+                call send-message($SYSLOG_TAG, $message);
+            }
+        }
+        if ($result_chassis-alarms/alarm-summary/no-active-alarms) {
+            set $message = "CHASSIS:   **  PASS  ** : There are no active chassis alarms";
+            call send-message($SYSLOG_TAG, $message);
+        }
+    }
+
+    /* CHASSIS HARDWARE STATUS */
+
+    var $query1 = { <get-environment-information>; }
+    var $result1 = jcs:invoke($query1);
+    mvar $test1 = "PASS";
+    for-each ($result1/environment-item[status!="OK"]) {
+        set $message = "CHASSIS:   *** FAIL *** : Component - " _ name _ " is " _ status;
+        call send-message($SYSLOG_TAG, $message);
+        if (comment) {
+            set $message = "                          Details: " _ comment;
+            call send-message($SYSLOG_TAG, $message);
+        }
+        if (temperature) {
+            set $message = "                          Temperature: " _ temperature;
+            call send-message($SYSLOG_TAG, $message);
+        }
+        set $test1 = "FAIL";
+    }
+    if ($test1 == "PASS") {
+        set $message = "CHASSIS:   **  PASS  ** : Environment component checks are all OK";
+        call send-message($SYSLOG_TAG, $message);
+    }
+
+    /* CHASSIS PIC INFORMATION */
+
+    var $query2 = { <get-pic-information>; }
+    var $result2 = jcs:invoke($query2);
+    mvar $test2 = "PASS";
+    for-each ($result2/fpc) {
+        if (state!="Online") {
+            set $message = "CHASSIS:   *** FAIL *** : FPC - " _ slot _ " is " _ state;
+            call send-message($SYSLOG_TAG, $message);
+            set $test2 = "FAIL";
+        }
+        for-each (/pic[pic-state!="Online"]) {
+            set $message = "CHASSIS:   *** FAIL *** : PIC - " _ pic-slot _ " on FPC - " _ slot _ " is " _ state;
+            call send-message($SYSLOG_TAG, $message);
+            if (pic-type) {
+                set $message = "                          Component: " _ description;
+                call send-message($SYSLOG_TAG, $message);
+            }
+            set $test2 = "FAIL";
+        }
+    }
+    if ($test2 == "PASS") {
+        set $message = "CHASSIS:   **  PASS  ** : FPC and PIC status checks are all OK";
+        call send-message($SYSLOG_TAG, $message);
+    }
+}
+
+template system-template($SYSLOG_TAG) {
+    mvar $message = "";
+
+    /* SYSTEM ALARMS */
+
+    var $query10 = { <command> "show system alarms"; }
+    var $result10 = jcs:invoke($query10);
+    <alarm-information> {
+        for-each($result10/alarm-detail) {
+            if (alarm-class == "Minor") {
+                set $message = "SYSTEM:    **  WARN  ** : " _ alarm-class _" ALARM - " _ alarm-description;
+                call send-message($SYSLOG_TAG, $message);
+            }
+            else if (alarm-class == "Major") {
+                set $message = "SYSTEM:    *** FAIL *** : " _ alarm-class _" ALARM - " _ alarm-description;
+                call send-message($SYSLOG_TAG, $message);
+            }
+            else {
+                set $message = "SYSTEM:    !!! ERROR !! : Active alarm was not captured by script";
+                call send-message($SYSLOG_TAG, $message);
+            }
+        }
+        if ($result10/alarm-summary/no-active-alarms) {
+            set $message = "SYSTEM:    **  PASS  ** : There are no active system alarms";
+            call send-message($SYSLOG_TAG, $message);
+        }
+    }
+
+    /* SYSTEM UPTIME AND USERS */
+
+    var $query20 = { <command> "show system users"; }
+    var $result20 = jcs:invoke($query20);
+    if ($result20/multi-routing-engine-item) {
+        for-each ($result20/multi-routing-engine-item) {
+            set $message "SYSTEM:    *   INFO   * : System (" _ re-name _ ") Uptime is " _ system-users-information/uptime-information/up-time;
+            call send-message($SYSLOG_TAG, $message);
+            for-each (./system-users-information/uptime-information/user-table/user-entry) {
+                set $message "SYSTEM:    *   INFO   * : " _ user _" is currently logged in from " _ from _" since " _ login-time;
+                call send-message($SYSLOG_TAG, $message);
+            }
+        }
+    }
+    else {
+        <system-users-information> {
+            set $message "SYSTEM:    *   INFO   * : System Uptime is " _$result20/uptime-information/up-time;
+            call send-message($SYSLOG_TAG, $message);
+            for-each ($result20/uptime-information/user-table/user-entry) {
+                set $message "SYSTEM:    *   INFO   * : " _ user _" is currently logged in from " _ from _" since " _ login-time;
+                call send-message($SYSLOG_TAG, $message);
+            }
+        }
+    }
+
+    /* SYSTEM LAST COMMIT */
+
+    var $query30 = { <command> "show system commit"; }
+    var $result30 = jcs:invoke($query30);
+    <commit-information> {
+        set $message "SYSTEM:    *   INFO   * : Last commit was " _$result30/commit-history/date-time _" by: " _$result30/commit-history/user;
+        call send-message($SYSLOG_TAG, $message);
+    }
+
+    /* SYSTEM VERSION */
+
+    var $query40 = { <get-software-information> {<detail>;}; }
+    var $result40 = jcs:invoke($query40);
+    mvar $current-version-number = "";
+    mvar $target-version-number = "";
+
+    /** GET CURRENT VERSION **/
+
+    if ($result40/multi-routing-engine-item) {
+        for-each ($result40/multi-routing-engine-item) {
+            for-each (//version-information[component= "RPD"]) {
+                set $current-version-number = release;
+            }
+            set $message = "SYSTEM:    *   INFO   * : Device is a " _ //product-model _ " running " _ $current-version-number;
+            call send-message($SYSLOG_TAG, $message);
+        }
+    }
+    else {
+            for-each ($result40//version-information[component= "RPD"]) {
+                set $current-version-number = release;
+            }
+            set $message = "SYSTEM:    *   INFO   * : Device is a " _ $product _ " running " _ $current-version-number;
+            call send-message($SYSLOG_TAG, $message);
+    }
+
+    /** GET TARGET VERSION **/
+
+    for-each ($TARGET-VERSIONS/device) {
+        if ( starts-with($product, model-name )) {
+            set $target-version-number = target-version;
+        }
+    }
+
+    /** COMPARE CURRENT VERSION TO TARGET VERSION **/
+
+    if( $target-version-number == "" ) {
+        set $message = "SYSTEM:    !!! ERROR !! : No target version defined!";
+        call send-message($SYSLOG_TAG, $message);
+    }
+    else if( $current-version-number != $target-version-number ) {
+        set $message = "SYSTEM:    *** FAIL *** : Device " _ $product _ " is not running target Version of Junos, (" _ $target-version-number _ ")";
+        call send-message($SYSLOG_TAG, $message);
+    }
+    else if( $current-version-number == $target-version-number ) {
+        set $message = "SYSTEM:    **  PASS  ** : Device is running the target software release";
+        call send-message($SYSLOG_TAG, $message);
+    }
+
+    /* ROUTING-ENGINE-STATUS */
+
+    var $query45 = { <get-route-engine-information>; }
+    var $result45 = jcs:invoke($query45);
+
+    for-each ($result45/route-engine) {
+        if ((mastership-state!="master") && (mastership-state!="backup")) {
+            set $message = "SYSTEM:    *** FAIL *** : RE" _ slot _ " is not OK";
+            call send-message($SYSLOG_TAG, $message);
+            set $test45 = "FAIL";
+        }
+        if ((slot=="0") && (status=="OK")) {
+            set $message = "SYSTEM:    *   INFO   * : RE0 is " _ status _ " and " _ mastership-state;
+            call send-message($SYSLOG_TAG, $message);
+        }
+        if ((slot=="1") && (status=="OK")) {
+            set $message = "SYSTEM:    *   INFO   * : RE1 is " _ status _ " and " _ mastership-state;
+            call send-message($SYSLOG_TAG, $message);
+        }
+        if ((!slot) && (status=="OK")) {
+            set $message = "SYSTEM:    **  PASS  ** : Routing Engine is " _ status;
+            call send-message($SYSLOG_TAG, $message);
+        }
+        if (cpu-temperature>="65") {
+            set $message = "SYSTEM:    **  WARN  ** : System temperature high!!! ("_ cpu-temperature _").";
+            call send-message($SYSLOG_TAG, $message);
+        } else {
+            set $message = "SYSTEM:    **  PASS  ** : System temperature is normal!";
+            call send-message($SYSLOG_TAG, $message);
+        }
+        if ((cpu-idle<="50") || (load-average-fifteen>=0.75)) {
+            set $message = "SYSTEM:    **  WARN  ** : System load is high!!! (User: "_ cpu-user _"% System: "_ cpu-system _"% Background: "_ cpu-background _"%)";
+            call send-message($SYSLOG_TAG, $message);
+        }
+    }
+
+    /* SYSTEM STORAGE CHECK */
+
+    var $query35 = { <command> "show system storage"; }
+    var $result35 = jcs:invoke($query35);
+    var $filter35 = "\/dev\/(gpt\/junos|(da|bo)0s([12]a|3[ef]))";
+    mvar $test35 = "PASS";
+    if ($result35/multi-routing-engine-item) {
+        for-each ($result35/multi-routing-engine-item) {
+            for-each (./system-storage-information/filesystem[filesystem-name=='/dev/gpt/junos']) {
+                if (./used-percent >= 90) {
+                    set $message = "SYSTEM:    *** FAIL *** : Disk Partition " _ mounted-on _ " on " _ ../../re-name _" is currently at " _ used-percent _ "% used space.";
+                    call send-message($SYSLOG_TAG, $message);
+                    set $test35 = "FAIL";
+                }
+                else if (./used-percent >= 75) {
+                    set $message = "SYSTEM:    **  WARN  ** : Disk Partition " _ mounted-on _ " on " _ ../../re-name _" is currently at " _ used-percent _ "% used space.";
+                    call send-message($SYSLOG_TAG, $message);
+                    set $test35 = "WARN";
+                }
+            }
+        }
+    }
+    else {
+        <system-storage-information> {
+            for-each ($result35/filesystem[filesystem-name==jcs:regex($filter35,filesystem-name)]) {
+                if (./used-percent >= 90) {
+                    set $message = "SYSTEM:    *** FAIL *** : Disk Partition " _ mounted-on _ " is currently at " _ used-percent _ "% used space.";
+                    call send-message($SYSLOG_TAG, $message);
+                    set $test35 = "FAIL";
+                }
+                else if (./used-percent >= 75) {
+                    set $message = "SYSTEM:    **  WARN  ** : Disk Partition " _ mounted-on _ " is currently at " _ used-percent _ "% used space.";
+                    call send-message($SYSLOG_TAG, $message);
+                    set $test35 = "WARN";
+                }
+            }
+        }
+    }
+    if ($test35=="PASS") {
+        set $message = "SYSTEM:    *   PASS   * : All tested disk partitions are below 75% Used.";
+        call send-message($SYSLOG_TAG, $message);
+    }
+
+    /* LICENSE CHECK */
+
+    var $query46 = {
+        <get-license-summary-information>;
+    }
+    var $result46 = jcs:invoke($query46);
+    for-each ($result46/license-usage-summary/feature-summary) {
+        if (validity-type=="invalid") {
+            set $message "SYSTEM:    *** FAIL *** : The feature license " _ name _ " is " _ validity-type;
+            call send-message($SYSLOG_TAG, $message);
+        }
+        if (used-licensed>licensed) {
+            set $message "SYSTEM:    *** FAIL *** : The feature license " _ name _ " is oversubscribed!";
+            call send-message($SYSLOG_TAG, $message);
+        }
+    }
+}
+
+/******************** END OF TEMPLATE *********************/
+
+template ldp-template() {
+    mvar $message = "";
+
+    /* LDP-NEIGHBORS-UP-COUNT */
+
+    var $query50 = {
+        <get-ldp-interface-information>;
+    }
+    var $ldp-interface = jcs:invoke($query50);
+    var $result50 = count($ldp-interface/ldp-interface[ldp-neighbor-count=="1"]);
+    set $message "LDP:       *   INFO   * : There are " _$result50 _ " LDP neighbor interfaces UP (inc lo0.0)";
+    call send-message($SYSLOG_TAG, $message);
+
+    /* LDP-SESSION-UP-COUNT */
+
+    var $query55 = {
+        <get-ldp-session-information>;
+    }
+    var $result55 = jcs:invoke($query55);
+    var $count55 = count($result55/ldp-session[ldp-session-state=="Operational"]);
+    set $message "LDP:       *   INFO   * : There are "_$count55 _ " neighbor sessions UP";
+    call send-message($SYSLOG_TAG, $message);
+
+    /* LDP-NEIGHBOR-DOWN-IDENTIFICATION */
+
+    var $query60 = { <command> "show ldp interface"; }
+    var $result60 = jcs:invoke($query60);
+    <ldp-interface-information> {
+        for-each($result60/ldp-interface) {
+            if (ldp-neighbor-count=="0") {
+                set $message "LDP:       *** FAIL *** : Interface " _ interface-name _" has zero neighbors";
+                call send-message($SYSLOG_TAG, $message);
+            }
+        }
+    }
+}
+
+/******************** END OF TEMPLATE *********************/
+
+template ospf-template() {
+    mvar $message = "";
+
+    /* OSPF-NEIGHBORS-UP-COUNT */
+
+    var $query70 = {
+        <get-ospf-neighbor-information>;
+    }
+    var $result70 = jcs:invoke($query70);
+    var $count70 = count($result70/ospf-neighbor[ospf-neighbor-state=="Full"]);
+    set $message "OSPF:      *   INFO   * : There are "_$count70 _ " OSPF neighbor sessions UP";
+    call send-message($SYSLOG_TAG, $message);
+
+    /* OSPF-NEIGHBOR-DOWN-IDENTIFICATION */
+
+    var $query80 = { <command> "show ospf interface"; }
+    var $result80 = jcs:invoke($query80);
+    <ospf-interface-information> {
+        for-each($result80/ospf-interface) {
+            if ((neighbor-count=="0") && (interface-name!="lo0.0")) {
+                set $message "OSPF:      *** FAIL *** : Neighbor session configured on " _ interface-name _" is DOWN";
+                call send-message($SYSLOG_TAG, $message);
+            }
+        }
+    }
+}
+
+/******************** END OF TEMPLATE *********************/
+
+template rsvp-template() {
+    mvar $message = "";
+
+    /* RSVP-NEIGHBORS-UP-COUNT */
+
+    var $query90 = {
+        <get-rsvp-interface-information>;
+    }
+    var $result90 = jcs:invoke($query90);
+    var $count90 = count($result90/rsvp-interface[rsvp-status="Up"]);
+    set $message "RSVP:      *   INFO   * : There are "_$count90 _ " RSVP interfaces UP";
+    call send-message($SYSLOG_TAG, $message);
+
+    /* RSVP-LSP's */
+
+    var $query95 = {
+        <get-mpls-lsp-information>;
+    }
+    var $result95 = jcs:invoke($query95);
+    for-each ($result95/rsvp-session-data[session-type=="Ingress"]) {
+        set $message "RSVP:      *   INFO   * : There are " _ count _ " Egress-LSPs Operational";
+        call send-message($SYSLOG_TAG, $message);
+    }
+    for-each ($result95/rsvp-session-data[session-type=="Egress"]) {
+        set $message "RSVP:      *   INFO   * : There are " _ count _ " Ingress-LSPs Operational";
+        call send-message($SYSLOG_TAG, $message);
+    }
+
+    /* RSVP-NEIGHBOR-DOWN-IDENTIFICATION */
+
+    var $query100 = { <command> "show rsvp interface"; }
+    var $result100 = jcs:invoke($query100);
+    <rsvp-interface-information> {
+        for-each($result100/rsvp-interface) {
+            if ((rsvp-status=="Down") && (interface-name!="lo0.0")) {
+                set $message "RSVP:      *** FAIL *** : Neighbor session configured on " _ interface-name _" is DOWN";
+                call send-message($SYSLOG_TAG, $message);
+            }
+        }
+    }
+}
+
+/******************** END OF TEMPLATE *********************/
+
+template bgp-template() {
+    mvar $message = "";
+
+    /* BGP-NEIGHBORS-UP-COUNT */
+
+    var $query110 = {
+        <get-bgp-summary-information>;
+    }
+    var $result110 = jcs:invoke($query110);
+    var $count110 = count($result110/bgp-peer[peer-state=="Established"]);
+    set $message "BGP:       *   INFO   * : There are "_$count110 _ " BGP neighbor sessions UP";
+    call send-message($SYSLOG_TAG, $message);
+
+    /* BGP-NEIGHBOR-DOWN-IDENTIFICATION */
+
+    var $query120 = { <command> "show bgp summary"; }
+    var $result120 = jcs:invoke($query120);
+    <bgp-information> {
+        for-each($result120/bgp-peer[peer-state!="Established"]) {
+            set $message "BGP:       *** FAIL *** : Peer " _ description _" @ " _ peer-address _" is DOWN";
+            call send-message($SYSLOG_TAG, $message);
+        }
+    }
+}
+
+/******************** END OF TEMPLATE *********************/
+
+template vpn-template() {
+    mvar $message = "";
+
+    /* VPN-TUNNEL-UP-COUNT */
+
+    var $query140 = {
+        <get-security-associations-information>;
+    }
+    var $result140 = jcs:invoke($query140);
+    <ipsec-security-associations-information> {
+        if($result140/total-active-tunnels != 0) {
+            set $message "VPN:       *   INFO   * : There are "_ total-active-tunnels _ " VPN tunnels UP";
+            call send-message($SYSLOG_TAG, $message);
+        }
+    }
+
+    /* VPN-TUNNEL-DOWN-IDENTIFICATION */
+
+    var $query141 = {
+        <get-inactive-tunnels>;
+    }
+    var $query142 = {
+        <get-inactive-tunnels> {
+            <detail>;
+        }
+    }
+    var $result141 = jcs:invoke($query141);
+    var $result142 = jcs:invoke($query142);
+    <ipsec-unestablished-tunnel-information> {
+        if($result141/total-inactive-tunnels != 0) {
+            for-each($result142/ipsec-security-associations-block) {
+                set $message "VPN:       *** FAIL *** : Tunnel " _ sa-vpn-name _" @ " _ sa-remote-gateway _" is DOWN";
+                call send-message($SYSLOG_TAG, $message);
+                set $message "                          Reason: " _ sa-ipsec-tunnel-events/sa-tunnel-event;
+                call send-message($SYSLOG_TAG, $message);
+            }
+        }
+    }
+}
+
+/******************** END OF TEMPLATE *********************/
+
+template interface-template() {
+    mvar $message = "";
+
+    /* CONFIGURED INTERFACES IN UP/DOWN STATE */
+
+    mvar $test130 = "PASS";
+    var $rpc-config-req = <get-configuration database="committed" inherit="inherit">;
+    var $configuration = jcs:invoke($rpc-config-req);
+    for-each($configuration/interfaces/interface) {
+        var $name130 = name;
+        var $query131 = {
+            <get-interface-information> {
+                <terse>;
+                if ($name130) {
+                    <interface-name> $name130;
+                }
+            }
+        }
+        var $result131 = jcs:invoke($query131);
+        <interface-information> {
+            for-each ($result131/physical-interface/logical-interface) {
+                if ((admin-status=="up") && (oper-status=="down")) {
+                    set $message "INTERFACE: *** FAIL *** : Configured interface " _ name _" is Admin Up but Operationally DOWN";
+                    call send-message($SYSLOG_TAG, $message);
+                    set $test130 = "FAIL";
+                }
+            }
+        }
+    }
+    if ($test130=="PASS") {
+        set $message "INTERFACE: *   PASS   * : All Configured interfaces appear to be UP";
+        call send-message($SYSLOG_TAG, $message);
+    }
+}
+
+/******************** END OF TEMPLATE *********************/
+
+/* ---------------------------------------- */
+/* this function is used get serial number  */
+/* ---------------------------------------- */
+<func:function name="ztp:serial-number">
+{
+    param $jnx;
+
+    var $cmd = <get-chassis-inventory>;
+    var $sn = jcs:execute( $jnx, $cmd )//chassis/serial-number;
+
+    <func:result select="$sn">;
+}
+
+/* ------------------------------------------------------------------ */
+/* this function is used to send a custom message to syslog and stout */
+/* ------------------------------------------------------------------ */
+template send-message($SYSLOG_TAG, $message)
+{
+    <output> $message;
+    expr jcs:syslog( $SYSLOG, $SYSLOG_TAG, $message );
+}
