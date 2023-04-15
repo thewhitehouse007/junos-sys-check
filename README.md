@@ -44,7 +44,8 @@ op url https://raw.githubusercontent.com/thewhitehouse007/junos-sys-check/main/j
 
 If you find any bugs or have suggestions for improvements/additional checks please forward them to <hidden>
 
-### Example Console and SYSLOG Output:
+### Example Console Output:
+NOTE: Output is also logged to SYSLOG
 ```
 -------------------------------------------------------------------------------------------------------
                                        Welcome admin

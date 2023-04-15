@@ -193,20 +193,20 @@ template system-template($SYSLOG_TAG) {
     var $result20 = jcs:invoke($query20);
     if ($result20/multi-routing-engine-item) {
         for-each ($result20/multi-routing-engine-item) {
-            set $message "SYSTEM:    *   INFO   * : System (" _ re-name _ ") Uptime is " _ system-users-information/uptime-information/up-time;
+            set $message = "SYSTEM:    *   INFO   * : System (" _ re-name _ ") Uptime is " _ system-users-information/uptime-information/up-time;
             call send-message($SYSLOG_TAG, $message);
             for-each (./system-users-information/uptime-information/user-table/user-entry) {
-                set $message "SYSTEM:    *   INFO   * : " _ user _" is currently logged in from " _ from _" since " _ login-time;
+                set $message = "SYSTEM:    *   INFO   * : " _ user _" is currently logged in from " _ from _" since " _ login-time;
                 call send-message($SYSLOG_TAG, $message);
             }
         }
     }
     else {
         <system-users-information> {
-            set $message "SYSTEM:    *   INFO   * : System Uptime is " _$result20/uptime-information/up-time;
+            set $message = "SYSTEM:    *   INFO   * : System Uptime is " _$result20/uptime-information/up-time;
             call send-message($SYSLOG_TAG, $message);
             for-each ($result20/uptime-information/user-table/user-entry) {
-                set $message "SYSTEM:    *   INFO   * : " _ user _" is currently logged in from " _ from _" since " _ login-time;
+                set $message = "SYSTEM:    *   INFO   * : " _ user _" is currently logged in from " _ from _" since " _ login-time;
                 call send-message($SYSLOG_TAG, $message);
             }
         }
@@ -217,7 +217,7 @@ template system-template($SYSLOG_TAG) {
     var $query30 = { <command> "show system commit"; }
     var $result30 = jcs:invoke($query30);
     <commit-information> {
-        set $message "SYSTEM:    *   INFO   * : Last commit was " _$result30/commit-history/date-time _" by: " _$result30/commit-history/user;
+        set $message = "SYSTEM:    *   INFO   * : Last commit was " _$result30/commit-history/date-time _" by: " _$result30/commit-history/user;
         call send-message($SYSLOG_TAG, $message);
     }
 
@@ -357,11 +357,11 @@ template system-template($SYSLOG_TAG) {
     var $result46 = jcs:invoke($query46);
     for-each ($result46/license-usage-summary/feature-summary) {
         if (validity-type=="invalid") {
-            set $message "SYSTEM:    *** FAIL *** : The feature license " _ name _ " is " _ validity-type;
+            set $message = "SYSTEM:    *** FAIL *** : The feature license " _ name _ " is " _ validity-type;
             call send-message($SYSLOG_TAG, $message);
         }
         if (used-licensed>licensed) {
-            set $message "SYSTEM:    *** FAIL *** : The feature license " _ name _ " is oversubscribed!";
+            set $message = "SYSTEM:    *** FAIL *** : The feature license " _ name _ " is oversubscribed!";
             call send-message($SYSLOG_TAG, $message);
         }
     }
@@ -379,7 +379,7 @@ template ldp-template() {
     }
     var $ldp-interface = jcs:invoke($query50);
     var $result50 = count($ldp-interface/ldp-interface[ldp-neighbor-count=="1"]);
-    set $message "LDP:       *   INFO   * : There are " _$result50 _ " LDP neighbor interfaces UP (inc lo0.0)";
+    set $message = "LDP:       *   INFO   * : There are " _$result50 _ " LDP neighbor interfaces UP (inc lo0.0)";
     call send-message($SYSLOG_TAG, $message);
 
     /* LDP-SESSION-UP-COUNT */
@@ -389,7 +389,7 @@ template ldp-template() {
     }
     var $result55 = jcs:invoke($query55);
     var $count55 = count($result55/ldp-session[ldp-session-state=="Operational"]);
-    set $message "LDP:       *   INFO   * : There are "_$count55 _ " neighbor sessions UP";
+    set $message = "LDP:       *   INFO   * : There are "_$count55 _ " neighbor sessions UP";
     call send-message($SYSLOG_TAG, $message);
 
     /* LDP-NEIGHBOR-DOWN-IDENTIFICATION */
@@ -399,7 +399,7 @@ template ldp-template() {
     <ldp-interface-information> {
         for-each($result60/ldp-interface) {
             if (ldp-neighbor-count=="0") {
-                set $message "LDP:       *** FAIL *** : Interface " _ interface-name _" has zero neighbors";
+                set $message = "LDP:       *** FAIL *** : Interface " _ interface-name _" has zero neighbors";
                 call send-message($SYSLOG_TAG, $message);
             }
         }
@@ -418,7 +418,7 @@ template ospf-template() {
     }
     var $result70 = jcs:invoke($query70);
     var $count70 = count($result70/ospf-neighbor[ospf-neighbor-state=="Full"]);
-    set $message "OSPF:      *   INFO   * : There are "_$count70 _ " OSPF neighbor sessions UP";
+    set $message = "OSPF:      *   INFO   * : There are "_$count70 _ " OSPF neighbor sessions UP";
     call send-message($SYSLOG_TAG, $message);
 
     /* OSPF-NEIGHBOR-DOWN-IDENTIFICATION */
@@ -428,7 +428,7 @@ template ospf-template() {
     <ospf-interface-information> {
         for-each($result80/ospf-interface) {
             if ((neighbor-count=="0") && (interface-name!="lo0.0")) {
-                set $message "OSPF:      *** FAIL *** : Neighbor session configured on " _ interface-name _" is DOWN";
+                set $message = "OSPF:      *** FAIL *** : Neighbor session configured on " _ interface-name _" is DOWN";
                 call send-message($SYSLOG_TAG, $message);
             }
         }
@@ -447,7 +447,7 @@ template rsvp-template() {
     }
     var $result90 = jcs:invoke($query90);
     var $count90 = count($result90/rsvp-interface[rsvp-status="Up"]);
-    set $message "RSVP:      *   INFO   * : There are "_$count90 _ " RSVP interfaces UP";
+    set $message = "RSVP:      *   INFO   * : There are "_$count90 _ " RSVP interfaces UP";
     call send-message($SYSLOG_TAG, $message);
 
     /* RSVP-LSP's */
@@ -457,11 +457,11 @@ template rsvp-template() {
     }
     var $result95 = jcs:invoke($query95);
     for-each ($result95/rsvp-session-data[session-type=="Ingress"]) {
-        set $message "RSVP:      *   INFO   * : There are " _ count _ " Egress-LSPs Operational";
+        set $message = "RSVP:      *   INFO   * : There are " _ count _ " Egress-LSPs Operational";
         call send-message($SYSLOG_TAG, $message);
     }
     for-each ($result95/rsvp-session-data[session-type=="Egress"]) {
-        set $message "RSVP:      *   INFO   * : There are " _ count _ " Ingress-LSPs Operational";
+        set $message = "RSVP:      *   INFO   * : There are " _ count _ " Ingress-LSPs Operational";
         call send-message($SYSLOG_TAG, $message);
     }
 
@@ -472,7 +472,7 @@ template rsvp-template() {
     <rsvp-interface-information> {
         for-each($result100/rsvp-interface) {
             if ((rsvp-status=="Down") && (interface-name!="lo0.0")) {
-                set $message "RSVP:      *** FAIL *** : Neighbor session configured on " _ interface-name _" is DOWN";
+                set $message = "RSVP:      *** FAIL *** : Neighbor session configured on " _ interface-name _" is DOWN";
                 call send-message($SYSLOG_TAG, $message);
             }
         }
@@ -491,7 +491,7 @@ template bgp-template() {
     }
     var $result110 = jcs:invoke($query110);
     var $count110 = count($result110/bgp-peer[peer-state=="Established"]);
-    set $message "BGP:       *   INFO   * : There are "_$count110 _ " BGP neighbor sessions UP";
+    set $message = "BGP:       *   INFO   * : There are "_$count110 _ " BGP neighbor sessions UP";
     call send-message($SYSLOG_TAG, $message);
 
     /* BGP-NEIGHBOR-DOWN-IDENTIFICATION */
@@ -500,7 +500,7 @@ template bgp-template() {
     var $result120 = jcs:invoke($query120);
     <bgp-information> {
         for-each($result120/bgp-peer[peer-state!="Established"]) {
-            set $message "BGP:       *** FAIL *** : Peer " _ description _" @ " _ peer-address _" is DOWN";
+            set $message = "BGP:       *** FAIL *** : Peer " _ description _" @ " _ peer-address _" is DOWN";
             call send-message($SYSLOG_TAG, $message);
         }
     }
@@ -519,7 +519,7 @@ template vpn-template() {
     var $result140 = jcs:invoke($query140);
     <ipsec-security-associations-information> {
         if($result140/total-active-tunnels != 0) {
-            set $message "VPN:       *   INFO   * : There are "_ total-active-tunnels _ " VPN tunnels UP";
+            set $message = "VPN:       *   INFO   * : There are "_ total-active-tunnels _ " VPN tunnels UP";
             call send-message($SYSLOG_TAG, $message);
         }
     }
@@ -539,9 +539,9 @@ template vpn-template() {
     <ipsec-unestablished-tunnel-information> {
         if($result141/total-inactive-tunnels != 0) {
             for-each($result142/ipsec-security-associations-block) {
-                set $message "VPN:       *** FAIL *** : Tunnel " _ sa-vpn-name _" @ " _ sa-remote-gateway _" is DOWN";
+                set $message = "VPN:       *** FAIL *** : Tunnel " _ sa-vpn-name _" @ " _ sa-remote-gateway _" is DOWN";
                 call send-message($SYSLOG_TAG, $message);
-                set $message "                          Reason: " _ sa-ipsec-tunnel-events/sa-tunnel-event;
+                set $message = "                          Reason: " _ sa-ipsec-tunnel-events/sa-tunnel-event;
                 call send-message($SYSLOG_TAG, $message);
             }
         }
@@ -572,7 +572,7 @@ template interface-template() {
         <interface-information> {
             for-each ($result131/physical-interface/logical-interface) {
                 if ((admin-status=="up") && (oper-status=="down")) {
-                    set $message "INTERFACE: *** FAIL *** : Configured interface " _ name _" is Admin Up but Operationally DOWN";
+                    set $message = "INTERFACE: *** FAIL *** : Configured interface " _ name _" is Admin Up but Operationally DOWN";
                     call send-message($SYSLOG_TAG, $message);
                     set $test130 = "FAIL";
                 }
@@ -580,7 +580,7 @@ template interface-template() {
         }
     }
     if ($test130=="PASS") {
-        set $message "INTERFACE: *   PASS   * : All Configured interfaces appear to be UP";
+        set $message = "INTERFACE: *   PASS   * : All Configured interfaces appear to be UP";
         call send-message($SYSLOG_TAG, $message);
     }
 }
