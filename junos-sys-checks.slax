@@ -372,30 +372,32 @@ template ldp-template($SYSLOG_TAG) {
 
     /* LDP-NEIGHBORS-UP-COUNT */
 
-    var $query50 = {
+    var $query_ldp-int-information = {
         <get-ldp-interface-information>;
     }
-    var $ldp-interface = jcs:invoke($query50);
-    var $result50 = count($ldp-interface/ldp-interface[ldp-neighbor-count=="1"]);
-    set $message = "LDP:       *   INFO   * : There are " _$result50 _ " LDP neighbor interfaces UP (inc lo0.0)";
-    call send-message($SYSLOG_TAG, $message);
-
-    /* LDP-SESSION-UP-COUNT */
-
-    var $query55 = {
-        <get-ldp-session-information>;
+    var $ldp-int-information = jcs:invoke($query_ldp-int-information);
+    if ($ldp-int-information/output == "LDP instance is not running") {
+        set $message = "LDP:       *   INFO   * : LDP instance is not running";
+        call send-message($SYSLOG_TAG, $message);
     }
-    var $result55 = jcs:invoke($query55);
-    var $count55 = count($result55/ldp-session[ldp-session-state=="Operational"]);
-    set $message = "LDP:       *   INFO   * : There are "_$count55 _ " neighbor sessions UP";
-    call send-message($SYSLOG_TAG, $message);
+    else {
+        var $ldp-int-count = count($ldp-int-information/ldp-interface[ldp-neighbor-count=="1"]);
+        set $message = "LDP:       *   INFO   * : There are " _$ldp-int-count _ " LDP neighbor interfaces UP (inc lo0.0)";
+        call send-message($SYSLOG_TAG, $message);
 
-    /* LDP-NEIGHBOR-DOWN-IDENTIFICATION */
+        /* LDP-SESSION-UP-COUNT */
 
-    var $query60 = { <command> "show ldp interface"; }
-    var $result60 = jcs:invoke($query60);
-    <ldp-interface-information> {
-        for-each($result60/ldp-interface) {
+        var $query_ldp-sessions = {
+            <get-ldp-session-information>;
+        }
+        var $ldp-sessions = jcs:invoke($query_ldp-sessions);
+        var $ldp-session-count = count($ldp-sessions/ldp-session[ldp-session-state=="Operational"]);
+        set $message = "LDP:       *   INFO   * : There are "_$ldp-session-count _ " neighbor sessions UP";
+        call send-message($SYSLOG_TAG, $message);
+
+        /* LDP-NEIGHBOR-DOWN-IDENTIFICATION */
+
+        for-each($ldp-int-information/ldp-interface) {
             if (ldp-neighbor-count=="0") {
                 set $message = "LDP:       *** FAIL *** : Interface " _ interface-name _" has zero neighbors";
                 call send-message($SYSLOG_TAG, $message);
