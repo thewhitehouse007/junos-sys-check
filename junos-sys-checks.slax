@@ -66,17 +66,17 @@ match /
         <output> "-------------------------------------------------------------------------------------------------------";
         call system-template($SYSLOG_TAG);
         <output> "-------------------------------------------------------------------------------------------------------";
-        call ospf-template();
+        call ospf-template($SYSLOG_TAG);
         <output> "-------------------------------------------------------------------------------------------------------";
-        call ldp-template();
+        call ldp-template($SYSLOG_TAG);
         <output> "-------------------------------------------------------------------------------------------------------";
-        call rsvp-template();
+        call rsvp-template($SYSLOG_TAG);
         <output> "-------------------------------------------------------------------------------------------------------";
-        call bgp-template();
+        call bgp-template($SYSLOG_TAG);
         <output> "-------------------------------------------------------------------------------------------------------";
-        call vpn-template();
+        call vpn-template($SYSLOG_TAG);
         <output> "-------------------------------------------------------------------------------------------------------";
-        call interface-template();
+        call interface-template($SYSLOG_TAG);
         <output> "-------------------------------------------------------------------------------------------------------";
     }
 }
@@ -367,9 +367,7 @@ template system-template($SYSLOG_TAG) {
     }
 }
 
-/******************** END OF TEMPLATE *********************/
-
-template ldp-template() {
+template ldp-template($SYSLOG_TAG) {
     mvar $message = "";
 
     /* LDP-NEIGHBORS-UP-COUNT */
@@ -406,9 +404,7 @@ template ldp-template() {
     }
 }
 
-/******************** END OF TEMPLATE *********************/
-
-template ospf-template() {
+template ospf-template($SYSLOG_TAG) {
     mvar $message = "";
 
     /* OSPF-NEIGHBORS-UP-COUNT */
@@ -435,9 +431,7 @@ template ospf-template() {
     }
 }
 
-/******************** END OF TEMPLATE *********************/
-
-template rsvp-template() {
+template rsvp-template($SYSLOG_TAG) {
     mvar $message = "";
 
     /* RSVP-NEIGHBORS-UP-COUNT */
@@ -479,9 +473,7 @@ template rsvp-template() {
     }
 }
 
-/******************** END OF TEMPLATE *********************/
-
-template bgp-template() {
+template bgp-template($SYSLOG_TAG) {
     mvar $message = "";
 
     /* BGP-NEIGHBORS-UP-COUNT */
@@ -506,9 +498,7 @@ template bgp-template() {
     }
 }
 
-/******************** END OF TEMPLATE *********************/
-
-template vpn-template() {
+template vpn-template($SYSLOG_TAG) {
     mvar $message = "";
 
     /* VPN-TUNNEL-UP-COUNT */
@@ -548,9 +538,7 @@ template vpn-template() {
     }
 }
 
-/******************** END OF TEMPLATE *********************/
-
-template interface-template() {
+template interface-template($SYSLOG_TAG) {
     mvar $message = "";
 
     /* CONFIGURED INTERFACES IN UP/DOWN STATE */
