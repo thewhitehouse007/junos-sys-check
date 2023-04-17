@@ -385,7 +385,9 @@ template ospf_template($SYSLOG_TAG, $configuration) {
         }
         var $ospf_neighbours = jcs:invoke($query_ospf_neighbours);
         var $ospf_neighbour_count = count($ospf_neighbours/ospf-neighbor[ospf-neighbor-state=="Full"]) + count($ospf_neighbours/ospf-neighbor[ospf-neighbor-state=="2Way"]);
-        set $message = "OSPF:      *   INFO   * : There are "_$ospf_neighbour_count _ " OSPF neighbor sessions UP";
+        mvar $msg_sev = "*   INFO   *";
+        if ($ospf_neighbour_count == "0") { set $msg_sev = "**  WARN  **"; }
+        set $message = "OSPF:      "_$msg_sev _" : There are "_$ospf_neighbour_count _ " OSPF neighbor sessions UP";
         call send_message($SYSLOG_TAG, $message);
 
         /* OSPF-NEIGHBOR-DOWN-IDENTIFICATION */
@@ -431,7 +433,9 @@ template mpls_template($SYSLOG_TAG, $configuration) {
         /* MPLS-INTERFACE-UP-COUNT */
 
         var $mpls_int_count = count($mpls_int_information/mpls-interface[mpls-interface-state="Up"]);
-        set $message = "MPLS:      *   INFO   * : There are "_$mpls_int_count _ " MPLS interfaces UP";
+        mvar $msg_sev = "*   INFO   *";
+        if ($mpls_int_count == "0") { set $msg_sev = "**  WARN  **"; }
+        set $message = "MPLS:      "_$msg_sev _" : There are "_$mpls_int_count _ " MPLS interfaces UP";
         call send_message($SYSLOG_TAG, $message);
 
         /* MPLS-INTERFACES-DOWN */
@@ -465,7 +469,9 @@ template ldp_template($SYSLOG_TAG, $configuration) {
         /* LDP-NEIGHBORS-UP-COUNT */
     
         var $ldp_int_count = count($ldp_int_information/ldp-interface[ldp-neighbor-count=="1"]);
-        set $message = "LDP:       *   INFO   * : There are " _$ldp_int_count _ " LDP neighbor interfaces UP (inc lo0.0)"; 
+        mvar $msg_sev = "*   INFO   *";
+        if ($ldp_int_count == "0") { set $msg_sev = "**  WARN  **"; }
+        set $message = "LDP:       "_$msg_sev _" : There are " _$ldp_int_count _ " LDP neighbor interfaces UP (inc lo0.0)"; 
         call send_message($SYSLOG_TAG, $message);
 
         /* LDP-SESSION-UP-COUNT */
@@ -475,7 +481,9 @@ template ldp_template($SYSLOG_TAG, $configuration) {
         }
         var $ldp_sessions = jcs:invoke($query_ldp_sessions);
         var $ldp_session_count = count($ldp_sessions/ldp-session[ldp-session-state=="Operational"]);
-        set $message = "LDP:       *   INFO   * : There are "_$ldp_session_count _ " neighbor sessions UP";
+        set $msg_sev = "*   INFO   *";
+        if ($ldp_session_count == "0") { set $msg_sev = "**  WARN  **"; }
+        set $message = "LDP:       "_$msg_sev _" : There are "_$ldp_session_count _ " neighbor sessions UP";
         call send_message($SYSLOG_TAG, $message);
 
         /* LDP-NEIGHBOR-DOWN-IDENTIFICATION */
@@ -507,7 +515,9 @@ template rsvp_template($SYSLOG_TAG, $configuration) {
         /* RSVP-NEIGHBORS-UP-COUNT */
 
         var $rsvp_int_count = count($rsvp_int_information/rsvp-interface[rsvp-status="Up"]);
-        set $message = "RSVP:      *   INFO   * : There are "_$rsvp_int_count _ " RSVP interfaces UP";
+        mvar $msg_sev = "*   INFO   *";
+        if ($rsvp_int_count == "0") { set $msg_sev = "**  WARN  **"; }
+        set $message = "RSVP:      "_$msg_sev _" : There are "_$rsvp_int_count _ " RSVP interfaces UP";
         call send_message($SYSLOG_TAG, $message);
 
         /* RSVP-LSP's */
@@ -554,7 +564,9 @@ template bgp_template($SYSLOG_TAG, $configuration) {
         /* BGP-NEIGHBORS-UP-COUNT */
 
         var $bgp_peer_count = count($bgp_summary/bgp-peer[peer-state=="Established"]);
-        set $message = "BGP:       *   INFO   * : There are "_$bgp_peer_count _ " BGP neighbor sessions UP";
+        mvar $msg_sev = "*   INFO   *";
+        if ($bgp_peer_count == "0") { set $msg_sev = "**  WARN  **"; }
+        set $message = "BGP:       "_$msg_sev _" : There are "_$bgp_peer_count _ " BGP neighbor sessions UP";
         call send_message($SYSLOG_TAG, $message);
 
         /* BGP-NEIGHBOR-DOWN-IDENTIFICATION */
