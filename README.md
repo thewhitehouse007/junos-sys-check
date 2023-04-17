@@ -28,9 +28,10 @@ The scripts basic functions are:
 * Checks if any software licenses have expired or are oversubscribed.
 #### PROTOCOLS
 * Checks the following Protocols for status and neigbourship failures, etc
-  * LDP
   * OSPF
-  * RSVP
+  * MPLS
+    * LDP
+    * RSVP
   * BGP
 #### VPN
 * Checks for VPN tunnel failures. (For SRX Only)
@@ -50,28 +51,36 @@ NOTE: Output is also logged to SYSLOG
 -------------------------------------------------------------------------------------------------------
                                        Welcome admin
 -------------------------------------------------------------------------------------------------------
-    ** This is the output of the sys_check script for PBK-SW1 on Fri Oct  9 13:33:48 2020 **
+         ** This is the output of the sys_check script for <SERIAL_NUMBER> on srx320 **
 -------------------------------------------------------------------------------------------------------
 CHASSIS:   **  PASS  ** : There are no active chassis alarms
+CHASSIS:   **  PASS  ** : Environment component checks are all OK
+CHASSIS:   *** FAIL *** : FPC - 1 is Offline
 -------------------------------------------------------------------------------------------------------
-SYSTEM:    **  PASS  ** : There are no active system alarms
-SYSTEM:    *   INFO   * : System (fpc0) Uptime is 96 days,  3:20
-SYSTEM:    *   INFO   * : admin is currently logged in from 172.31.227.8 since 30Sep20
-SYSTEM:    *   INFO   * : Last commit was 2020-10-01 11:46:58 AEST by: mist
-SYSTEM:    *   INFO   * : PBK-SW1(fpc0) is a ex2300-c-12p running 18.2R3-S2.9
-SYSTEM:    *   INFO   * : RE0 is OK and master and has been up for 96 days, 3 hours, 20 minutes, 4 seconds since 0x1:power cycle/failure
-SYSTEM:    **  WARN  ** : System load is high!!! (User: 60% System: 33% Background: 0%)
-SYSTEM:    **  WARN  ** : Partition /.mount on fpc0 is currently at  64% used space.
+SYSTEM:    **  WARN  ** : Minor ALARM - License for feature idp-sig(29) is about to expire
+SYSTEM:    *   INFO   * : System Uptime is 79 days,  4:01
+SYSTEM:    *   INFO   * : admin is currently logged in from 192.168.1.8 since 12:52PM
+SYSTEM:    *   INFO   * : Last commit was 2023-04-15 12:40:24 EST by: admin
+SYSTEM:    *   INFO   * : Device is a srx320 running 21.2R3-S3.5
+SYSTEM:    *** FAIL *** : Device srx320 is not running target Version of Junos, (21.4R3-S3)
+SYSTEM:    **  PASS  ** : Routing Engine is OK
+SYSTEM:    **  PASS  ** : System temperature is normal!
+SYSTEM:    **  WARN  ** : System load is high!!! (User: 53% System: 21% Background: 0%)
+SYSTEM:    **  WARN  ** : Disk Partition / is currently at  78% used space.
 -------------------------------------------------------------------------------------------------------
-OSPF:      **  PASS  ** : There are 0 OSPF neighbor sessions UP
+OSPF:      *   INFO   * : OSPF is not configured
 -------------------------------------------------------------------------------------------------------
-LDP:       **  PASS  ** : There are 0 LDP neighbor interfaces UP (inc lo0.0)
-LDP:       **  PASS  ** : There are 0 neighbor sessions UP
+MPLS:      *   INFO   * : MPLS is not configured
 -------------------------------------------------------------------------------------------------------
-RSVP:      **  PASS  ** : There are 0 RSVP interfaces UP
+BGP:       *   INFO   * : There are 5 BGP neighbor sessions UP
+BGP:       *** FAIL *** : Peer  @ 42.54.13.13 is DOWN
+BGP:       *** FAIL *** : Peer  @ 19.24.22.11 is DOWN
 -------------------------------------------------------------------------------------------------------
-BGP:       **  PASS  ** : There are 0 BGP neighbor sessions UP
--------------------------------------------------------------------------------------------------------
+VPN:       *   INFO   * : There are  VPN tunnels UP
+VPN:       *** FAIL *** : Tunnel use1-aws-01 @ 65.12.45.18 is DOWN
+                          Reason: IKE SA rekey successfully completed
+VPN:       *** FAIL *** : Tunnel use1-aws-02 @ 42.65.31.29 is DOWN
+                          Reason: IKE SA rekey successfully completed
 -------------------------------------------------------------------------------------------------------
 INTERFACE: *** FAIL *** : Configured interface ge-0/0/2.0 is Admin Up but Operationally DOWN
 INTERFACE: *** FAIL *** : Configured interface ge-0/0/3.0 is Admin Up but Operationally DOWN
