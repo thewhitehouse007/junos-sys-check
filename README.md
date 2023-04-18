@@ -43,6 +43,14 @@ To run the script, on any Internet connected Juniper Device...
 Execute the following command on the Operational mode prompt (>)
 op url https://raw.githubusercontent.com/thewhitehouse007/junos-sys-check/main/junos-sys-checks.slax
 
+### Options:
+There are several "modes" that the script can operate in, if you wish to pick specific tests e.g
+Using `./junos-sys-checks.slax mode <mode>` you can choose from the following options...
+* `full` - The default, runs all tests available, this can take a couple in minutes
+* `base` - Runs only Chassis and System checks, this is best used for ZTP testing
+* `proto` - Runs only Protocol Checks, this is a fast check.
+* `conn` - Runs only VPN (if SRX) and Interface checks, quick recheck option
+
 If you find any bugs or have suggestions for improvements/additional checks please forward them to <hidden>
 
 ### Example Console Output:

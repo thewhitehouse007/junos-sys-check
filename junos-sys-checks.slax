@@ -43,6 +43,8 @@ var $TARGET-VERSIONS := {
         <target-version> "21.4R3-S3";
     }
 }
+/*Collect define mode from cli or set default test mode to full */
+param $mode = "full";
 
 match /
 {
@@ -57,27 +59,35 @@ match /
     var $configuration = jcs:invoke($get_config);
 
     <op-script-results>  {
-        <output> "-------------------------------------------------------------------------------------------------------";
-        set $message = "                                       Welcome "_ $user ;
-        call send_message($SYSLOG_TAG, $message);
-        <output> "-------------------------------------------------------------------------------------------------------";
-        set $message = "         ** This is the output of the sys_check script for "_ $serial _" on " _ $product _ " ** ";
-        call send_message($SYSLOG_TAG, $message);
-        <output> "-------------------------------------------------------------------------------------------------------";
-        call chassis_template($SYSLOG_TAG);
-        <output> "-------------------------------------------------------------------------------------------------------";
-        call system_template($SYSLOG_TAG);
-        <output> "-------------------------------------------------------------------------------------------------------";
-        call ospf_template($SYSLOG_TAG, $configuration);
-        <output> "-------------------------------------------------------------------------------------------------------";
-        call mpls_template($SYSLOG_TAG, $configuration);
-        <output> "-------------------------------------------------------------------------------------------------------";
-        call bgp_template($SYSLOG_TAG, $configuration);
-        <output> "-------------------------------------------------------------------------------------------------------";
-        call vpn_template($SYSLOG_TAG);
-        <output> "-------------------------------------------------------------------------------------------------------";
-        call interface_template($SYSLOG_TAG, $configuration);
-        <output> "-------------------------------------------------------------------------------------------------------";
+            <output> "-------------------------------------------------------------------------------------------------------";
+            set $message = "                      Welcome "_ $user _ "                         Mode: "_ $mode;
+            call send_message($SYSLOG_TAG, $message);
+            <output> "-------------------------------------------------------------------------------------------------------";
+            set $message = "         ** This is the output of the sys_check script for "_ $serial _" on " _ $product _ " ** ";
+            call send_message($SYSLOG_TAG, $message);
+            <output> "-------------------------------------------------------------------------------------------------------";
+        if (($mode == "full") || ($mode == "base")) {
+            call chassis_template($SYSLOG_TAG);
+            <output> "-------------------------------------------------------------------------------------------------------";
+            call system_template($SYSLOG_TAG);
+            <output> "-------------------------------------------------------------------------------------------------------";
+        }
+        if (($mode == "full") || ($mode == "proto")) {
+            call ospf_template($SYSLOG_TAG, $configuration);
+            <output> "-------------------------------------------------------------------------------------------------------";
+            call mpls_template($SYSLOG_TAG, $configuration);
+            <output> "-------------------------------------------------------------------------------------------------------";
+            call bgp_template($SYSLOG_TAG, $configuration);
+            <output> "-------------------------------------------------------------------------------------------------------";
+        }
+        if (($mode == "full") || ($mode == "conn")) {
+            if (starts-with($product,"srx")) {
+                call vpn_template($SYSLOG_TAG);
+                <output> "-------------------------------------------------------------------------------------------------------";
+            }
+            call interface_template($SYSLOG_TAG, $configuration);
+            <output> "-------------------------------------------------------------------------------------------------------";
+        }
     }
 }
 
@@ -615,6 +625,10 @@ template vpn_template($SYSLOG_TAG) {
                 call send_message($SYSLOG_TAG, $message);
             }
         }
+    }
+    if ($message == "") { 
+        set $message = "VPN:       *   INFO   * : There are no VPN tunnels Detected";
+        call send_message($SYSLOG_TAG, $message);
     }
 }
 
