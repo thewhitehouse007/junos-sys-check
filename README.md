@@ -1,6 +1,5 @@
 # Juniper Device System Checker
 
-
 Suitable to be run by Level 1 techs and On-call members.
 The intention if this script is to be a 'first port of call' when beginging your troubleshoot process...
 It will in most cases, point out any unusual states that should be investigated or may likely be related to the problem you are seeing. 
