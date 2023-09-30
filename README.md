@@ -36,6 +36,7 @@ The scripts basic functions are:
 * Checks for VPN tunnel failures. (For SRX Only)
 #### INTERFACES
 * Checks if any configured interfaces are operationally down. (may not be so useful on a switch)
+* Advanced checks on those configured interfaces for input/output, CRC, FEC & other errors.
 
 
 To run the script, on any Internet connected Juniper Device...
@@ -91,6 +92,15 @@ VPN:       *** FAIL *** : Tunnel use1-aws-02 @ 42.65.31.29 is DOWN
 -------------------------------------------------------------------------------------------------------
 INTERFACE: *** FAIL *** : Configured interface ge-0/0/2.0 is Admin Up but Operationally DOWN
 INTERFACE: *** FAIL *** : Configured interface ge-0/0/3.0 is Admin Up but Operationally DOWN
+INTERFACE: **  WARN  ** : Interface ge-0/0/2 Detected OUTPUT Errors (carrier-transitions: 53)
+INTERFACE: **  WARN  ** : Interface ge-0/0/2 autonegotiation incomplete
+INTERFACE: **  WARN  ** : Interface ge-0/0/2 has Active Alarms (ethernet-alarm-link-down)
+INTERFACE: **  WARN  ** : Interface ge-0/0/2 has Active Defects (ethernet-alarm-link-down)
+INTERFACE: *   INFO   * : Interface ge-0/0/2 last changed: 2023-09-09 23:13:15 AEST (2w6d 13:39 ago)
+INTERFACE: **  WARN  ** : Interface ge-0/0/3 autonegotiation incomplete
+INTERFACE: **  WARN  ** : Interface ge-0/0/3 has Active Alarms (ethernet-alarm-link-down)
+INTERFACE: **  WARN  ** : Interface ge-0/0/3 has Active Defects (ethernet-alarm-link-down)
+INTERFACE: *   INFO   * : Interface ge-0/0/3 last changed: 2023-09-09 23:13:15 AEST (2w6d 13:39 ago)
 -------------------------------------------------------------------------------------------------------
 
 ```
