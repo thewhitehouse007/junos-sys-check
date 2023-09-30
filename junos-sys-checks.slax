@@ -40,18 +40,20 @@ var $TARGET-VERSIONS := {
     }
     <device> {
         <model-name> "srx320";
-        <target-version> "21.4R3-S3";
+        <target-version> "21.4R3-S3.4";
     }
 }
-/*Collect define mode from cli or set default test mode to full */
-param $mode = "full";
+/* Collect defined mode from cli or set default mode to base for ZTP operations [full|base|proto|conn] */
+param $mode = "base";
+/* Collect snap option from cli or set default mode to enable snapshots to be performce [yes|no] */
+param $snap = "yes";
 
 match /
 {
     var $jnx = jcs:open();
     mvar $message = "";
 
-    /*Get serial number on current device */
+    /* Get serial number on current device */
     var $serial = ztp:serial-number( $jnx );
     var $SYSLOG_TAG = " " _ $serial _ " - ";
 
@@ -59,34 +61,34 @@ match /
     var $configuration = jcs:invoke($get_config);
 
     <op-script-results>  {
-            <output> "-------------------------------------------------------------------------------------------------------";
+            expr jcs:output("-------------------------------------------------------------------------------------------------------");
             set $message = "                      Welcome "_ $user _ "                         Mode: "_ $mode;
             call send_message($SYSLOG_TAG, $message);
-            <output> "-------------------------------------------------------------------------------------------------------";
+            expr jcs:output("-------------------------------------------------------------------------------------------------------");
             set $message = "         ** This is the output of the sys_check script for "_ $serial _" on " _ $product _ " ** ";
             call send_message($SYSLOG_TAG, $message);
-            <output> "-------------------------------------------------------------------------------------------------------";
+            expr jcs:output("-------------------------------------------------------------------------------------------------------");
         if (($mode == "full") || ($mode == "base")) {
             call chassis_template($SYSLOG_TAG);
-            <output> "-------------------------------------------------------------------------------------------------------";
+            expr jcs:output("-------------------------------------------------------------------------------------------------------");
             call system_template($SYSLOG_TAG);
-            <output> "-------------------------------------------------------------------------------------------------------";
+            expr jcs:output("-------------------------------------------------------------------------------------------------------");
         }
         if (($mode == "full") || ($mode == "proto")) {
             call ospf_template($SYSLOG_TAG, $configuration);
-            <output> "-------------------------------------------------------------------------------------------------------";
+            expr jcs:output("-------------------------------------------------------------------------------------------------------");
             call mpls_template($SYSLOG_TAG, $configuration);
-            <output> "-------------------------------------------------------------------------------------------------------";
+            expr jcs:output("-------------------------------------------------------------------------------------------------------");
             call bgp_template($SYSLOG_TAG, $configuration);
-            <output> "-------------------------------------------------------------------------------------------------------";
+            expr jcs:output("-------------------------------------------------------------------------------------------------------");
         }
         if (($mode == "full") || ($mode == "conn")) {
             if (starts-with($product,"srx")) {
                 call vpn_template($SYSLOG_TAG);
-                <output> "-------------------------------------------------------------------------------------------------------";
+                expr jcs:output("-------------------------------------------------------------------------------------------------------");
             }
             call interface_template($SYSLOG_TAG, $configuration);
-            <output> "-------------------------------------------------------------------------------------------------------";
+            expr jcs:output("-------------------------------------------------------------------------------------------------------");
         }
     }
 }
@@ -357,6 +359,129 @@ template system_template($SYSLOG_TAG) {
     }
     if ($quality_test=="PASS") {
         set $message = "SYSTEM:    *   PASS   * : All tested disk partitions are below 75% Used.";
+        call send_message($SYSLOG_TAG, $message);
+    }
+
+    /* SYSTEM SNAPSHOT CHECK */
+
+    mvar $snapshot_check_result_1 = "";
+    mvar $snapshot_check_result_2 = "";
+    if (starts-with($product, "ex2")) {
+        var $snapshot_version_1 = ztp:show-snapshot-version($product);
+        if ($snapshot_version_1 != "") {
+            set $message = "SYSTEM:    *   INFO   * : Device is detected as EX Switch, current snapshot version is "_ $snapshot_version_1;
+            call send_message($SYSLOG_TAG, $message);
+            if (starts-with($snapshot_version_1, $current-version-number)) {
+                set $snapshot_check_result_1 = "MATCH";
+                set $message = "SYSTEM:    **  PASS  ** : System Snapshot matchs current Junos version (" _ $current-version-number _ ")";
+                call send_message($SYSLOG_TAG, $message);
+            }
+            else {
+                set $snapshot_check_result_1 = "NOMATCH";
+                set $message = "SYSTEM:    **  WARN  ** : System Snapshot does NOT match current Junos version (" _ $current-version-number _ ")";
+                call send_message($SYSLOG_TAG, $message);
+            }
+        }
+        else {
+            set $message = "SYSTEM:    !!! ERROR !! : Snapshot information could not be found.";
+            call send_message($SYSLOG_TAG, $message);
+        }
+        if (($snapshot_check_result_1 != "MATCH") && ($snap == "yes")) {
+            set $message = "SYSTEM:    *   INFO   * : Attempting to perform system snapshot...";
+            call send_message($SYSLOG_TAG, $message);
+            if (ztp:take-snapshot($product)) {
+                set $message = "SYSTEM:    *   INFO   * : System Snapshot taken... Should now match current Junos version - checking!";
+            }
+            else {
+                set $message = "SYSTEM:    *** FAIL *** : System Snapshot failed... Checking snapshots...";
+            }
+            call send_message($SYSLOG_TAG, $message);
+        
+            var $snapshot_version_2 = ztp:show-snapshot-version($product);
+            if ($snapshot_version_2 != "") {
+                set $message = "SYSTEM:    *   INFO   * : Current snapshot version is now "_ $snapshot_version_2;
+                call send_message($SYSLOG_TAG, $message);
+                if (starts-with($snapshot_version_2, $current-version-number)) {
+                    set $snapshot_check_result_2 = "MATCH";
+                    set $message = "SYSTEM:    **  PASS  ** : System Snapshot matchs current Junos version (" _ $current-version-number _ ")";
+                    call send_message($SYSLOG_TAG, $message);
+                }
+                else {
+                    set $snapshot_check_result_2 = "NOMATCH";
+                    set $message = "SYSTEM:    *** FAIL *** : System Snapshot failed and does NOT match current Junos version (" _ $current-version-number _ ")";
+                    call send_message($SYSLOG_TAG, $message);
+                }
+            }
+            else {
+                set $message = "SYSTEM:    !!! ERROR !! : Snapshot information could not be found.";
+                call send_message($SYSLOG_TAG, $message);
+            }
+        }
+    }
+    else if ((starts-with($product, "srx")) || (starts-with($product, "ex")))  {
+        var $show_snapshot_information_1 = ztp:show-snapshot-version($product);
+        <snapshot-information> {
+            if ($show_snapshot_information_1/software-version/package/package-version) {
+                set $message = "SYSTEM:    *   INFO   * : Checking system snapshots... wait...";
+                call send_message($SYSLOG_TAG, $message);
+                for-each ($show_snapshot_information_1/software-version) {
+                    if (!starts-with(package/package-version, $current-version-number)) {
+                        set $snapshot_check_result_1 = "NOMATCH";
+                        set $message = "SYSTEM:    **  WARN  ** : System Snapshot does NOT match current Junos version (" _ package/package-version _ ")";
+                        call send_message($SYSLOG_TAG, $message);
+                        if ($snap == "yes") {
+                            set $message = "SYSTEM:    *   INFO   * : Performing System Snapshot... wait...";
+                            call send_message($SYSLOG_TAG, $message);
+                            /* TODO: This reports as failed on SRXs but actually succeeds... */
+                            if (ztp:take-snapshot($product)) {
+                                set $message = "SYSTEM:    *   INFO   * : System Snapshot taken... Should now match current Junos version - checking...";
+                            }
+                            else {
+                                set $message = "SYSTEM:    *** FAIL *** : System Snapshot failed!!!";
+                            }
+                            call send_message($SYSLOG_TAG, $message);
+                        }
+                    }
+                }
+                if ($snapshot_check_result_1 == "") {
+                    set $message = "SYSTEM:    **  PASS  ** : System Snapshots match current Junos version (" _ $show_snapshot_information_1/software-version/package/package-version _ ")";
+                    call send_message($SYSLOG_TAG, $message);
+                    set $snapshot_check_result_1 = "MATCH";
+                }
+            }
+            else {
+                set $message = "SYSTEM:    !!! ERROR !! : System Snapshot could not be determined or does not exist.";
+                call send_message($SYSLOG_TAG, $message);
+            }
+        }
+        if (($snapshot_check_result_1 != "MATCH") && ($snap == "yes")) {
+            var $show_snapshot_information_2 = ztp:show-snapshot-version($product);
+            <snapshot-information> {
+                if ($show_snapshot_information_2/software-version/package/package-version) {
+                    set $message = "SYSTEM:    *   INFO   * : Checking system snapshots (Post-Snapshot)... wait...";
+                    call send_message($SYSLOG_TAG, $message);
+                    for-each ($show_snapshot_information_2/software-version) {
+                        if (!starts-with(package/package-version, $current-version-number)) {
+                            set $snapshot_check_result_2 = "NOMATCH";
+                            set $message = "SYSTEM:    *** FAIL *** : System Snapshot does NOT match the current Junos version after snapshot operation.";
+                            call send_message($SYSLOG_TAG, $message);
+                        }
+                    }
+                    if ($snapshot_check_result_2 == "") {
+                        set $message = "SYSTEM:    **  PASS  ** : System Snapshot now matches current Junos version (" _ $show_snapshot_information_2/software-version/package/package-version _ ")";
+                        call send_message($SYSLOG_TAG, $message);
+                        set $snapshot_check_result_2 = "MATCH";
+                    }
+                }
+                else {
+                    set $message = "SYSTEM:    !!! ERROR !! : System Snapshot could not be determined or does not exist.";
+                    call send_message($SYSLOG_TAG, $message);
+                }
+            }
+        }
+    }
+    else {
+        set $message = "SYSTEM:    !!! ERROR !! : Device type not EX or SRX, snapshot check aborted.";
         call send_message($SYSLOG_TAG, $message);
     }
 
@@ -680,11 +805,71 @@ template interface_template($SYSLOG_TAG, $configuration) {
     <func:result select="$sn">;
 }
 
+/* ----------------------------------------------- */
+/* this function is used to show system snapshots  */
+/* ----------------------------------------------- */
+<func:function name="ztp:show-snapshot-version">
+{
+    param $model;
+    mvar $cmd = { <command> "show system snapshot media internal";}
+    mvar $snapshot_version = "";
+    mvar $return = false();
+
+    if (starts-with($model, "ex2")) {
+        var $output = jcs:invoke( $cmd )//multi-routing-engine-item/output;
+        var $lines = jcs:break-lines($output);
+        for $line ($lines) {
+            if (starts-with($line,'Junos version')) {
+                set $snapshot_version = substring-after($line, 'Junos version: ');
+            }
+        }
+        set $return = $snapshot_version;
+    }
+    else if (starts-with($model, "srx")) {
+        var $output = jcs:invoke( $cmd );
+        set $return = $output;
+    }
+    else if (starts-with($model, "ex")) {
+        /* var $output = jcs:invoke( $cmd )//software-version[1]/package[1]/package-version[1]; */
+        var $output = jcs:invoke( $cmd )//multi-routing-engine-item/snapshot-information;
+        set $return = $output;
+    }
+    else {
+        expr jcs:output('ERROR: Device type not EX or SRX, snapshot check aborted!');
+    }
+    result $return;
+}
+
+/* ----------------------------------------------- */
+/* this function is used to take system snapshots  */
+/* ----------------------------------------------- */
+<func:function name="ztp:take-snapshot">
+{
+    param $model;
+    mvar $cmd = "";
+    mvar $return = false();
+
+    if (starts-with($model, "ex2")) {
+        set $cmd = <command> "request system snapshot recovery all-members";
+        var $result = jcs:invoke( $cmd )//multi-routing-engine-item/output;
+        if ($result) { set $return = true(); } 
+    }
+    else if ((starts-with($model, "srx")) || (starts-with($model, "ex"))) {
+        set $cmd = <command> "request system snapshot slice alternate";
+        var $result = jcs:invoke( $cmd )//snapshot-information/snapshot-copy/destination-directory;
+        if ($result) { set $return = true(); }
+    }
+    else {
+        expr jcs:output('ERROR: Device type not EX or SRX, snapshot aborted!');
+    }
+    result $return;
+}
+
 /* ------------------------------------------------------------------ */
 /* this function is used to send a custom message to syslog and stout */
 /* ------------------------------------------------------------------ */
 template send_message($SYSLOG_TAG, $message)
 {
-    <output> $message;
+    expr jcs:output( $message );
     expr jcs:syslog( $SYSLOG, $SYSLOG_TAG, $message );
 }
