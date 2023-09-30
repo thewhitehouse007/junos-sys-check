@@ -24,6 +24,7 @@ The scripts basic functions are:
 * Compares the running version against the configured list of target versions
 * Checks in the Routing Engines are healthy or under load & cpu tempurature
 * Checks on Disk usage for important Partitions
+* Checks the system snapshots are up to date and performs a snapshot if required
 * Checks if any software licenses have expired or are oversubscribed.
 #### PROTOCOLS
 * Checks the following Protocols for status and neigbourship failures, etc
@@ -44,6 +45,7 @@ Execute the following command on the Operational mode prompt (>)
 op url https://raw.githubusercontent.com/thewhitehouse007/junos-sys-check/main/junos-sys-checks.slax
 
 ### Options:
+## Mode
 There are several "modes" that the script can operate in, if you wish to pick specific tests e.g
 Using `./junos-sys-checks.slax mode <mode>` you can choose from the following options...
 * `full` - The default, runs all tests available, this can take a couple in minutes
@@ -51,13 +53,20 @@ Using `./junos-sys-checks.slax mode <mode>` you can choose from the following op
 * `proto` - Runs only Protocol Checks, this is a fast check.
 * `conn` - Runs only VPN (if SRX) and Interface checks, quick recheck option
 
+## Snapshots
+The default operation is to perform a system snapshot if the existing snapshot version does not match
+the version of code running on the device. You may override this to prevent the snapshot operation 
+being performed. (Note: This will still validate if the snapshots are up to date.)
+Example: ``./junos-sys-checks.slax snap no`
+
 If you find any bugs or have suggestions for improvements/additional checks please forward them to <hidden>
 
 ### Example Console Output:
+`./junos-sys-checks.slax mode <mode> snap no`
 NOTE: Output is also logged to SYSLOG
 ```
 -------------------------------------------------------------------------------------------------------
-                                       Welcome admin
+                      Welcome admin                         Mode: full
 -------------------------------------------------------------------------------------------------------
          ** This is the output of the sys_check script for <SERIAL_NUMBER> on srx320 **
 -------------------------------------------------------------------------------------------------------
@@ -66,15 +75,18 @@ CHASSIS:   **  PASS  ** : Environment component checks are all OK
 CHASSIS:   *** FAIL *** : FPC - 1 is Offline
 -------------------------------------------------------------------------------------------------------
 SYSTEM:    **  WARN  ** : Minor ALARM - License for feature idp-sig(29) is about to expire
-SYSTEM:    *   INFO   * : System Uptime is 79 days,  4:01
-SYSTEM:    *   INFO   * : admin is currently logged in from 192.168.1.8 since 12:52PM
-SYSTEM:    *   INFO   * : Last commit was 2023-04-15 12:40:24 EST by: admin
-SYSTEM:    *   INFO   * : Device is a srx320 running 21.2R3-S3.5
+SYSTEM:    *   INFO   * : System Uptime is 103 days, 22:10
+SYSTEM:    *   INFO   * : admin is currently logged in from 192.168.1.8 since 10:11AM
+SYSTEM:    *   INFO   * : Last commit was 2023-09-26 12:06:08 EST by: admin
+SYSTEM:    *   INFO   * : Device is a srx320 running 21.4R3-S3.4
 SYSTEM:    *** FAIL *** : Device srx320 is not running target Version of Junos, (21.4R3-S3)
 SYSTEM:    **  PASS  ** : Routing Engine is OK
 SYSTEM:    **  PASS  ** : System temperature is normal!
-SYSTEM:    **  WARN  ** : System load is high!!! (User: 53% System: 21% Background: 0%)
+SYSTEM:    **  WARN  ** : System load is high!!! (User: 52% System: 20% Background: 0%)
 SYSTEM:    **  WARN  ** : Disk Partition / is currently at  78% used space.
+SYSTEM:    *** INFO *** : Checking system snapshots... wait...
+SYSTEM:    **  PASS  ** : System Snapshots match current Junos version (21.4R3-S3.4)
+SYSTEM:    *** FAIL *** : The feature license idp-sig is oversubscribed!
 -------------------------------------------------------------------------------------------------------
 OSPF:      *   INFO   * : OSPF is not configured
 -------------------------------------------------------------------------------------------------------
