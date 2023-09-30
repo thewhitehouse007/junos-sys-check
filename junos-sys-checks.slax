@@ -774,18 +774,178 @@ template interface_template($SYSLOG_TAG, $configuration) {
             }
         }
         var $interface_information = jcs:invoke($query_interface_information);
+        var $sev_text = (starts-with($product,"ex")) ? "**  WARN  **" : "*** FAIL ***"; 
         <interface-information> {
-            for-each ($interface_information/physical-interface/logical-interface) {
-                if ((admin-status=="up") && (oper-status=="down")) {
-                    set $message = "INTERFACE: *** FAIL *** : Configured interface " _ name _" is Admin Up but Operationally DOWN";
-                    call send_message($SYSLOG_TAG, $message);
-                    set $quality_test = "FAIL";
-                }
+            for-each ($interface_information/physical-interface/logical-interface[admin-status=="up"][oper-status=="down"]) {
+                set $message = "INTERFACE: "_ $sev_text _" : Configured interface " _ name _" is Admin Up but Operationally DOWN";
+                call send_message($SYSLOG_TAG, $message);
+                set $quality_test = "FAIL";
             }
         }
     }
     if ($quality_test=="PASS") {
         set $message = "INTERFACE: *   PASS   * : All Configured interfaces appear to be UP";
+        call send_message($SYSLOG_TAG, $message);
+    }
+
+    /* CHECK CONFIGURED INTERFACES FOR ERRORS */
+
+    for-each($configuration/interfaces/interface) {
+        mvar $show_last_flap = false();
+        var $interface_name = name;
+        var $query_interface_detail = {
+            <get-interface-information> {
+                <extensive>;
+                if ($interface_name) {
+                    <interface-name> $interface_name;
+                }
+            }
+        }
+        var $interface_detail = jcs:invoke($query_interface_detail)/physical-interface;
+        <interface-information> {
+            var $test_list := {
+                /* 
+                    Table for listing the tests to be performed on an an individual XML path (not group of elements)
+                    <check_name> = Name used to describe the test and print out on report prepended to the collected values
+                    <path_name> = XML Path of the element you wish to test (cannot take wildcards)
+                    <severity> = "FAIL" | "WARN" , "INFO" is the default if not specified, will display on report, with ** _ ** format...
+                            "FAIL" also triggers action to change quality_test value if the test criteria is met.
+                    <ignore-if-linkdown> = add to trigger a test skip if the interface is already in downstate.
+                */
+                <check> {
+                    <check_name> "Link Mode is ";
+                    <path_name> $interface_detail/link-mode;
+                    <pass_value> "Full-duplex";
+                    <severity> "WARN";
+                    <ignore-if-linkdown>;
+                }
+                <check> {
+                    <check_name> "Ethernet-Switching Errors: ";
+                    <path_name> $interface_detail/eth-switch-error;
+                    <pass_value> "none";
+                    <severity> "FAIL";
+                }
+                <check> {
+                    <check_name> "BPDU Errors: ";
+                    <path_name> $interface_detail/bpdu-error;
+                    <pass_value> "none";
+                    <severity> "FAIL";
+                }
+                <check> {
+                    <check_name> "Loop Detect PDU Errors: ";
+                    <path_name> $interface_detail/ld-pdu-error;
+                    <pass_value> "none";
+                    <severity> "FAIL";
+                }
+                <check> {
+                    <check_name> "Layer 2 Protocol Tunneling Errors: ";
+                    <path_name> $interface_detail/l2pt-error;
+                    <pass_value> "none";
+                    <severity> "FAIL";
+                }
+                <check> {
+                    <check_name> "Loopback is ";
+                    <path_name> $interface_detail/loopback;
+                    <pass_value> "disabled";
+                    <severity> "WARN";
+                }
+                <check> {
+                    <check_name> "Remote Fault: ";
+                    <path_name> $interface_detail/if-remote-fault;
+                    <pass_value> "online";
+                    <severity> "FAIL";
+                }
+            }
+            for-each ($test_list/check) {
+                var $sev_text = (severity=="FAIL") ? "*** FAIL ***" : ((severity=="WARN") ? "**  WARN  **" : "*   INFO   *");
+                if (($interface_detail/oper-status == "down") && (ignore-if-linkdown)) {
+                    /* Skip this test */
+                }
+                else if ((path_name != "") && (path_name != pass_value)) {
+                    set $message = "INTERFACE: " _ $sev_text _ " : Interface " _ $interface_detail/name _ " " _ check_name _ path_name;
+                    call send_message($SYSLOG_TAG, $message);
+                    if (severity == "FAIL") { 
+                        set $quality_test = "FAIL"; 
+                        set $show_last_flap = true();
+                    }
+                }
+            }
+            /* Autonegotion, if enabled check if completed else report state */
+            if ($interface_detail/if-auto-negotiation == "enabled") {
+                if ($interface_detail/ethernet-autonegotiation/autonegotiation-status == "complete") {
+                    if ($interface_detail/ethernet-autonegotiation/link-partner-status == "OK") {
+                        /* AutoNeg OK, skip reporting */
+                    }
+                    else { 
+                        set $message = "INTERFACE: **  WARN  ** : Interface " _ $interface_detail/name _ " link Partner "_ $interface_detail/ethernet-autonegotiation/link-partner-status;
+                        call send_message($SYSLOG_TAG, $message);
+                        set $show_last_flap = true();
+                    }
+                }
+                else {
+                    set $message = "INTERFACE: **  WARN  ** : Interface " _ $interface_detail/name _ " autonegotiation "_ $interface_detail/ethernet-autonegotiation/autonegotiation-status;
+                    call send_message($SYSLOG_TAG, $message);
+                    set $show_last_flap = true();
+                }
+            } 
+             /* Report on active alarms */
+            if (!$interface_detail/active-alarms/interface-alarms/alarm-not-present) {
+                for-each ($interface_detail/active-alarms/interface-alarms/*) {
+                    set $message = "INTERFACE: **  WARN  ** : Interface " _ $interface_detail/name _ " has Active Alarms ("_ name() _")";
+                    call send_message($SYSLOG_TAG, $message);
+                    set $show_last_flap = true();
+                }
+            }
+            /* Report on active Defects */
+            if (!$interface_detail/active-defects/interface-alarms/alarm-not-present) {
+                for-each ($interface_detail/active-defects/interface-alarms/*) {
+                    set $message = "INTERFACE: **  WARN  ** : Interface " _ $interface_detail/name _ " has Active Defects ("_ name() _")";
+                    call send_message($SYSLOG_TAG, $message);
+                    set $show_last_flap = true();
+                }
+            }
+            /* If requested by the previous tests show "last flapped" timestamp */
+            if ($show_last_flap) {
+                set $message = "INTERFACE: *   INFO   * : Interface " _ $interface_detail/name _ " last changed: " _ $interface_detail/interface-flapped;
+                call send_message($SYSLOG_TAG, $message);
+            }
+            /* Check for input errors */
+            for-each ($interface_detail/input-error-list/*[text() > 50]) {
+                set $message = "INTERFACE: **  WARN  ** : Interface " _ $interface_detail/name _ " Detected INPUT Errors ("_ name() _": "_ text() _")";
+                call send_message($SYSLOG_TAG, $message);
+            }
+            /* Check for output errors */
+            for-each ($interface_detail/output-error-list/*[text() > 50]) {
+                set $message = "INTERFACE: **  WARN  ** : Interface " _ $interface_detail/name _ " Detected OUTPUT Errors ("_ name() _": "_ text() _")";
+                call send_message($SYSLOG_TAG, $message);
+            }
+            /* Check PCS Errors */
+            for-each ($interface_detail/ethernet-pcs-statistics/*[text() > 100]) {
+                set $message = "INTERFACE: **  WARN  ** : Interface " _ $interface_detail/name _ " Detected PCS Errors ("_ name() _": "_ text() _")";
+                call send_message($SYSLOG_TAG, $message);
+            }
+            /* Check MAC CRC and FIFO Errors */
+            for-each ($interface_detail/ethernet-mac-statistics/*[contains(name(),"errors")][text() > 100]) {
+                set $message = "INTERFACE: **  WARN  ** : Interface " _ $interface_detail/name _ " Detected Errors ("_ name() _": "_ text() _")";
+                call send_message($SYSLOG_TAG, $message);
+            }
+            /* Check FEC Errors */
+            if ($interface_detail/ethernet-fec-mode/enabled_fec_mode) {
+                for-each ($interface_detail/ethernet-fec-statistics/*[text() > 100]) {
+                    set $message = "INTERFACE: **  WARN  ** : Interface " _ $interface_detail/name _ " Detected FEC Errors ("_ name() _": "_ text() _")";
+                    call send_message($SYSLOG_TAG, $message);
+                }
+            }
+            /* Checks if drop count is high on each QoS queue */
+            for-each ($interface_detail/queue-counters/queue[queue-counters-total-drop-packets > 1000]) {
+                set $message = "INTERFACE: *** FAIL *** : Interface queue, drop count high for " _ forwarding-class-name;
+                call send_message($SYSLOG_TAG, $message);
+                set $quality_test = "FAIL";
+            }
+        }
+    }
+    if ($quality_test=="PASS") {
+        set $message = "INTERFACE: *   PASS   * : All Configured interfaces PASS";
         call send_message($SYSLOG_TAG, $message);
     }
 }
