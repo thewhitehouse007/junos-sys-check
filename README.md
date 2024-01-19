@@ -15,6 +15,7 @@ The scripts basic functions are:
 * Checks for Chassis Alarms
 * Checks for failed hardware such as fans/mpcs/psu
 * Checks that all attached PICs are online
+* Checks the POE Controllers for any pending firmware updates
 #### SYSTEM
 * Checks for any system alarms
 * Reports on system Uptime
@@ -73,6 +74,7 @@ NOTE: Output is also logged to SYSLOG
 CHASSIS:   **  PASS  ** : There are no active chassis alarms
 CHASSIS:   **  PASS  ** : Environment component checks are all OK
 CHASSIS:   *** FAIL *** : FPC - 1 is Offline
+CHASSIS:   **  PASS  ** : POE Controller 0 is up-to-date!
 -------------------------------------------------------------------------------------------------------
 SYSTEM:    **  WARN  ** : Minor ALARM - License for feature idp-sig(29) is about to expire
 SYSTEM:    *   INFO   * : System Uptime is 103 days, 22:10

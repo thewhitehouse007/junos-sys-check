@@ -170,6 +170,54 @@ template chassis_template($SYSLOG_TAG) {
         set $message = "CHASSIS:   **  PASS  ** : FPC and PIC status checks are all OK";
         call send_message($SYSLOG_TAG, $message);
     }
+
+    /* POE CONTROLLER FIRMWARE CHECK */
+
+    var $query_poe_information = { <get-poe-controller-information>; }
+    var $poe_information = jcs:invoke($query_poe_information);
+    set $quality_test = "PASS";
+    for-each ($poe_information/controller-information) {
+        if (controller-firmware-available) {
+            set $message = "CHASSIS:   **  FAIL  ** : POE Controller " _ controller-number _ " requires update!";
+            call send_message($SYSLOG_TAG, $message);
+
+            set $message = "CHASSIS:   *   INFO   * : Run `request system firmware upgrade poe fpc-slot " _ controller-number _ "`";
+            call send_message($SYSLOG_TAG, $message);
+            set $message = "CHASSIS:   *   INFO   * : This procedure is disruptive and will take around 10 mins to complete...";
+            call send_message($SYSLOG_TAG, $message);
+            set $message = "CHASSIS:   *   INFO   * : Run `show poe controller` to confirm completion";
+            call send_message($SYSLOG_TAG, $message);
+
+            /* ### Future feature to enable auto POE Update on request ###
+            if ($POE_UPDATE == "yes") {
+                var $command3 = jcs:invoke(<command> "request system firmware upgrade poe fpc-slot " _ controller-number);
+                if ($command3) {
+                    expr jcs:output($command3);
+                    set $message = "CHASSIS:   **  WARN  ** : POE Controller " _ controller-number _ " update triggered!";
+                    call send-message($SYSLOG_TAG, $message);
+                    set $message = "CHASSIS:   **  WARN  ** : This procedure will take around 10 minutes to complete...";
+                    call send-message($SYSLOG_TAG, $message);
+                    set $message = "CHASSIS:   **  WARN  ** : Run `show poe controller` to confirm completion";
+                    call send-message($SYSLOG_TAG, $message);
+                }
+                else {
+                    set $test3 = "FAIL";
+                }
+            }
+            else {
+                set $test3 = "FAIL";
+            }
+            */
+        }
+        else {
+            set $message = "CHASSIS:   **  PASS  ** : POE Controller " _ controller-number _ " is up-to-date!";
+            call send_message($SYSLOG_TAG, $message);
+        }
+    }
+    if ($quality_test == "FAIL") {
+        set $message = "CHASSIS:   **  FAIL  ** : POE Controller Firmware update failed or was not performed.";
+        call send_message($SYSLOG_TAG, $message);
+    }
 }
 
 template system_template($SYSLOG_TAG) {
