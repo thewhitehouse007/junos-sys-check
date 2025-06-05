@@ -45,7 +45,7 @@ var $TARGET-VERSIONS := {
 }
 /* Collect defined mode from cli or set default mode to base for ZTP operations [full|base|proto|conn] */
 param $mode = "base";
-/* Collect snap option from cli or set default mode to enable snapshots to be performce [yes|no] */
+/* Collect snap option from cli or set default mode to enable snapshots to be performed [yes|no] */
 param $snap = "yes";
 
 match /
