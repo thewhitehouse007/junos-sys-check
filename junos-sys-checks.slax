@@ -32,7 +32,7 @@ var $TARGET-VERSIONS := {
     }
     <device> {
         <model-name> "ex2300";
-        <target-version> "21.4R3-S3.4";
+        <target-version> "23.4R2-S4.11";
     }
     <device> {
         <model-name> "srx220";
@@ -40,7 +40,7 @@ var $TARGET-VERSIONS := {
     }
     <device> {
         <model-name> "srx320";
-        <target-version> "21.4R3-S3.4";
+        <target-version> "23.4R2-S3.9";
     }
 }
 /* Collect defined mode from cli or set default mode to base for ZTP operations [full|base|proto|conn] */
